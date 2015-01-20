@@ -118,10 +118,10 @@ class Raster():
         return (band_green - band_midred) / (band_green + band_midred)
 
     def fusion (self, pan, output_image):
-        """ Write the result of a fusion between the two images of a bundle, using 
-        the Pansharpening OTB application
+        """ Write the merge result between the two images of a bundle, using 
+        the BundleToPerfectSensor OTB application
         
-        pan : a Raster object of the panchromatic image 
+        pan : a Raster instance of the panchromatic image 
         output_image : path and name of the output image
         """
          
@@ -138,5 +138,52 @@ class Raster():
          
         # The following line execute the application 
         Pansharpening.ExecuteAndWriteOutput()
-
+    
+    def extract_filename(rst):
+        """Return the filename attribute of a raster instance
+        """
+        return rst.filename
+        
+    def ndvi_otb(self, output_image):
+        """ Write a ndvi image, using the RadiometricIndices OTB application
+        
+        output_image : path and name of the output image
+        """
+         
+        # The following line creates an instance of the RadiometricIndices application 
+        RadiometricIndices = otbApplication.Registry.CreateApplication("RadiometricIndices") 
+         
+        # The following lines set all the application parameters: 
+        RadiometricIndices.SetParameterString("in", self.filename) 
+         
+        RadiometricIndices.SetParameterString("list", "NDVI") 
+        
+        RadiometricIndices.SetParameterString("out", output_image) 
+        # The following line execute the application 
+        RadiometricIndices.ExecuteAndWriteOutput()
+        
+    def concatenate(self, list_im, output_image):   
+        """Concatenate a list of images of the same size into a single multi-channel one,
+        using the ConcatenateImages OTB application
+        
+        list_im : a list of raster instances
+        output_image : path and name of the output image
+        """
+        # Creates a new list of the path image from the list of raster instances
+        list_path = [self.filename]
+                
+        list_path.extend(map(extract_filename,list_im))
+        
+        # The following line creates an instance of the ConcatenateImages application 
+        ConcatenateImages = otbApplication.Registry.CreateApplication("ConcatenateImages") 
+         
+        # The following lines set all the application parameters: 
+        ConcatenateImages.SetParameterStringList("il", list_path) 
+         
+        ConcatenateImages.SetParameterString("out", output_image) 
+         
+        # The following line execute the application 
+        ConcatenateImages.ExecuteAndWriteOutput()
+    
+    
     
