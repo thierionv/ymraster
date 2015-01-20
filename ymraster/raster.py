@@ -76,37 +76,32 @@ class Raster():
         with rasterio.drivers(CPL_DEBUG=True):  # Register GDAL format drivers
             with rasterio.open(self.filename) as img:
                 for i in range(self.number_bands):
-                    array[:, :, i] = img.read_band(i)
+                    array[:, :, i] = img.read_band(i+1)
+        return array
 
     def ndvi_array(self):
         """Return the Normlized Difference Vegetation Index (NDVI) of the image
         """
-
-        band_red = image[:, :, self.idx_red]
-        band_infrared = image[:, :, self.idx_infrared]
+        array = self.array()
+        band_red = array[:, :, self.idx_red]
+        band_infrared = array[:, :, self.idx_infrared]
         band_red = np.where(band_infrared + band_red == 0, 1, band_red)
         return (band_infrared - band_red) / (band_infrared + band_red)
 
-    def ndmi_array(self, out_filename):
-        """Return the Normalized Difference Moisture Index (NDMI) of an image
-
-
+    def ndmi_array(self):
+        """Return the Normalized Difference Moisture Index (NDMI) of the image
         """
-        band_infrared = image[:, :, i_infrared]
-        band_midred = image[:, :, i_midred]
-        band_infrared = np.where(band_midred + band_infrared == 0, 1, band_infrared)
+        array = self.array()
+        band_infrared = array[:, :, self.idx_infrared]
+        band_midred = array[:, :, self.idx_midred]
+        band_infrared = np.where(band_midred + band_infrared == 0, 1,
+                                 band_infrared)
         return (band_infrared - band_midred) / (band_infrared + band_midred)
 
-    def ndsi_array(self, out_filename):
-        """Return the Normalized Difference Snow Index (NDSI) of an image
-
-        image: a 3+-dimensional numpy array containing pixels from which to compute
-               NDVI
-        i_green: index of the red band in image (starts at 0)
-        i_midred: index of the infrared band in image (starts at 0)
-
-        """
-        band_green = image[:, :, i_green]
-        band_midred = image[:, :, i_midred]
+    def ndsi_array(self):
+        """Return the Normalized Difference Snow Index (NDSI) of the image"""
+        array = self.array()
+        band_green = array[:, :, self.idx_green]
+        band_midred = array[:, :, self.idx_midred]
         band_green = np.where(band_midred + band_green == 0, 1, band_green)
         return (band_green - band_midred) / (band_green + band_midred)
