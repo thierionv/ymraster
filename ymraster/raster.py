@@ -11,10 +11,13 @@ This module contains classes for manipulating raster images. It is based on:
     * NumPy_ for computations,
 
     * rasterio_ for reading and writing raster efficiently
+    
+    * OTB_ for merge, concatenate and segmentation operations
 
 :: _GDAL: http://gdal.org/
 :: _NumPy: http://www.numpy.org/
 :: _rasterio: https://github.com/mapbox/rasterio
+:: _OTB: http://www.orfeo-toolbox.org/CookBook/
 
 
 The ``Raster`` class
@@ -26,6 +29,14 @@ The ``Raster`` class define an Image readed from a file.
 from osgeo import gdal
 import numpy as np
 import rasterio
+
+# Gérer plus tard les chemins d'accès qui ne sont pas les mêmes pour toutes les
+#machines
+import os
+import sys
+sys.path.append('/usr/lib/otb/python')
+os.environ["ITK_AUTOLOAD_PATH"] = "/usr/lib/otb/applications"
+import otbApplication 
 
 
 class Raster():
@@ -105,3 +116,27 @@ class Raster():
         band_midred = array[:, :, self.idx_midred]
         band_green = np.where(band_midred + band_green == 0, 1, band_green)
         return (band_green - band_midred) / (band_green + band_midred)
+
+    def fusion (self, pan, output_image):
+        """ Write the result of a fusion between the two images of a bundle, using 
+        the Pansharpening OTB application
+        
+        pan : a Raster object of the panchromatic image 
+        output_image : path and name of the output image
+        """
+         
+        # The following line creates an instance of the Pansharpening application 
+        Pansharpening = otbApplication.Registry.CreateApplication("BundleToPerfectSensor") 
+         
+        # The following lines set all the application parameters: 
+        Pansharpening.SetParameterString("inp", pan.filename) 
+         
+        Pansharpening.SetParameterString("inxs", self.filename) 
+         
+        Pansharpening.SetParameterString("out", output_image) 
+        #Pansharpening.SetParameterOutputImagePixelType("out", 3) 
+         
+        # The following line execute the application 
+        Pansharpening.ExecuteAndWriteOutput()
+
+    
