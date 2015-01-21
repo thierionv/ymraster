@@ -33,7 +33,7 @@ class Raster():
 
     The whole raster *is not* loaded into memory. Instead this class records
     useful information about the raster (number and position of bands,
-    resolution, ...) and provide useful methods for comparing raster,
+    resolution, ...) and provide useful methods for comparing rasters,
     computing some indices, etc.
 
     """
@@ -87,6 +87,13 @@ class Raster():
         band_infrared = array[:, :, self.idx_infrared]
         band_red = np.where(band_infrared + band_red == 0, 1, band_red)
         return (band_infrared - band_red) / (band_infrared + band_red)
+
+    def ndvi(self, out_filename):
+        """Return the Normlized Difference Vegetation Index (NDVI) of the image
+
+        :param outfilename: path to the desired file where data is written
+        """
+        ndvi_array = self.ndvi_array()
 
     def ndmi_array(self):
         """Return the Normalized Difference Moisture Index (NDMI) of the image

@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 
 import unittest
+import unittest.mock
 
 from ymraster import Raster
+import numpy as np
 
 
-class TestRaster(unittest.TestCase):
+class TestRealRaster(unittest.TestCase):
 
     def setUp(self):
         self.filename = 'tests/data/RGB.byte.tif'
@@ -26,10 +28,26 @@ class TestRaster(unittest.TestCase):
         self.assertEqual(self.raster.idx_red, 2)
 
 
+class TestRasterIndices(unittest.TestCase):
+
+    def setUp(self):
+        self.filename = 'tests/data/RGB.byte.tif'
+        self.raster = Raster(self.filename, 'blue', 'green', 'red')
+        self.raster.array = unittest.mock.Mock(
+            return_value=np.arange(1, 28).reshape(3, 3, 4))
+        self.raster.idx_green = unittest.mock.Mock(return_value=0)
+        self.raster.idx_red = unittest.mock.Mock(return_value=1)
+        self.raster.idx_infrared = unittest.mock.Mock(return_value=1)
+        self.raster.idx_infrared = unittest.mock.Mock(return_value=1)
+
+    def test_should_compute_correct_ndvi(self):
+        self.assertEqual(self.raster.filename, self.filename)
+
+
 def suite():
     suite = unittest.TestSuite()
     load_from = unittest.defaultTestLoader.loadTestsFromTestCase
-    suite.addTests(load_from(TestRaster))
+    suite.addTests(load_from(TestRasterIndices))
     return suite
 
 
