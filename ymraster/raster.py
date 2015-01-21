@@ -49,8 +49,11 @@ def _save_array(array, out_filename, meta):
     """
     with rasterio.drivers():
         with rasterio.open(out_filename, 'w', **meta) as raster:
-            for i, band in enumerate(array):
-                raster.write_band(i+1, band)
+            if meta['count'] == 1:
+                raster.write_band(1, array)
+            else:
+                for i, band in enumerate(array):
+                    raster.write_band(i+1, band)
 
 
 class Raster():
