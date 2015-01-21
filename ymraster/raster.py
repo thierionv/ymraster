@@ -166,3 +166,78 @@ class Raster():
         ConcatenateImages.SetParameterStringList("il", list_path)
         ConcatenateImages.SetParameterString("out", output_image)
         ConcatenateImages.ExecuteAndWriteOutput()
+
+    def lsms_smoothing(self, output_filtered_image, spatialr, ranger, maxiter, output_spatial_image = ''):
+        """First step of the segmentation : perform a mean shift fitlering, using
+        the MeanShiftSmoothing otb application
+
+        output_filtered_image : path and name of the output image filtered
+        output_spatial_image : path and name of the output spatial image, the default
+            value is an empty string, as this parameter is optional in MeanSiftSmoothing
+            application
+        spatialr : Int, Spatial radius of the neighborhooh
+        ranger: Float, Range radius defining the radius (expressed in radiometry unit)
+            in the multi-spectral space.
+        maxiter : Int, Maximum number of iterations of the algorithm used in
+            MeanSiftSmoothing application
+        """
+        #TODO : fix the paramaters and provide the posibility to the user to set them
+
+        # The following line creates an instance of the MeanShiftSmoothing application
+        MeanShiftSmoothing = otbApplication.Registry.CreateApplication("MeanShiftSmoothing")
+
+        # The following lines set all the application parameters:
+        MeanShiftSmoothing.SetParameterString("in", self.filename)
+
+        MeanShiftSmoothing.SetParameterString("fout", output_filtered_image)
+
+        MeanShiftSmoothing.SetParameterString("foutpos", output_spatial_image)
+
+        MeanShiftSmoothing.SetParameterInt("spatialr", spatialr)
+
+        MeanShiftSmoothing.SetParameterFloat("ranger", ranger)
+
+        MeanShiftSmoothing.SetParameterFloat("thres", 0.1)
+
+        MeanShiftSmoothing.SetParameterFloat("rangeramp", 0.1)
+
+        MeanShiftSmoothing.SetParameterInt("maxiter", maxiter)
+
+        # The following line execute the application
+        MeanShiftSmoothing.ExecuteAndWriteOutput()
+
+    def lsms_seg (self,input_pos_img, output_image, spatialr, ranger):
+        """Second step of the segmentation : produce a labeled image with different clusters,
+        according to the range and spatial proximity of the pixels, using the LSMSSegmentation
+        otb application
+
+        input_pos_img : Raster instance of a spatial image, which may have been created in the smoothing step
+        output_image : path and name of the output labeled image
+        spatialr : Int, Spatial radius of the neighborhooh
+        ranger: Float, Range radius defining the radius (expressed in radiometry unit) in the multi-spectral space.
+        """
+        # The following line creates an instance of the LSMSSegmentation application
+        LSMSSegmentation = otbApplication.Registry.CreateApplication("LSMSSegmentation")
+
+        # The following lines set all the application parameters:
+        LSMSSegmentation.SetParameterString("in", self.filename)
+
+        LSMSSegmentation.SetParameterString("inpos", input_pos_img.filename)
+
+        LSMSSegmentation.SetParameterString("out", output_image)
+
+        LSMSSegmentation.SetParameterFloat("ranger", ranger)
+
+        LSMSSegmentation.SetParameterFloat("spatialr", spatialr)
+
+        LSMSSegmentation.SetParameterInt("minsize", 0)
+
+        LSMSSegmentation.SetParameterInt("tilesizex", 256)
+
+        LSMSSegmentation.SetParameterInt("tilesizey", 256)
+
+        # The following line execute the application
+        LSMSSegmentation.ExecuteAndWriteOutput()
+
+
+
