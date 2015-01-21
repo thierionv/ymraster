@@ -11,10 +11,13 @@ This module contains classes for manipulating raster images. It is based on:
     * NumPy_ for computations,
 
     * rasterio_ for reading and writing raster efficiently
+    
+    * OTB_ for merge, concatenate and segmentation operations
 
 :: _GDAL: http://gdal.org/
 :: _NumPy: http://www.numpy.org/
 :: _rasterio: https://github.com/mapbox/rasterio
+:: _OTB: http://www.orfeo-toolbox.org/CookBook/
 
 
 The ``Raster`` class
@@ -26,6 +29,14 @@ The ``Raster`` class define an Image readed from a file.
 from osgeo import gdal
 import numpy as np
 import rasterio
+
+# Gérer plus tard les chemins d'accès qui ne sont pas les mêmes pour toutes les
+#machines
+import os
+import sys
+sys.path.append('/usr/lib/otb/python')
+os.environ["ITK_AUTOLOAD_PATH"] = "/usr/lib/otb/applications"
+import otbApplication 
 
 
 class Raster():
@@ -112,3 +123,73 @@ class Raster():
         band_midred = array[:, :, self.idx_midred]
         band_green = np.where(band_midred + band_green == 0, 1, band_green)
         return (band_green - band_midred) / (band_green + band_midred)
+
+    def fusion (self, pan, output_image):
+        """ Write the merge result between the two images of a bundle, using 
+        the BundleToPerfectSensor OTB application
+        
+        pan : a Raster instance of the panchromatic image 
+        output_image : path and name of the output image
+        """
+         
+        # The following line creates an instance of the Pansharpening application 
+        Pansharpening = otbApplication.Registry.CreateApplication("BundleToPerfectSensor") 
+         
+        # The following lines set all the application parameters: 
+        Pansharpening.SetParameterString("inp", pan.filename) 
+         
+        Pansharpening.SetParameterString("inxs", self.filename) 
+         
+        Pansharpening.SetParameterString("out", output_image) 
+        #Pansharpening.SetParameterOutputImagePixelType("out", 3) 
+         
+        # The following line execute the application 
+        Pansharpening.ExecuteAndWriteOutput()
+
+        
+    def ndvi_otb(self, output_image):
+        """ Write a ndvi image, using the RadiometricIndices OTB application
+        
+        output_image : path and name of the output image
+        """
+         
+        # The following line creates an instance of the RadiometricIndices application 
+        RadiometricIndices = otbApplication.Registry.CreateApplication("RadiometricIndices") 
+         
+        # The following lines set all the application parameters: 
+        RadiometricIndices.SetParameterString("in", self.filename) 
+        
+        RadiometricIndices.SetParameterInt("channels.red", self.idx_red) 
+        RadiometricIndices.SetParameterInt("channels.nir", self.idx_infrared) 
+         
+        RadiometricIndices.SetParameterStringList("list", ["Vegetation:NDVI"]) 
+        
+        RadiometricIndices.SetParameterString("out", output_image) 
+        # The following line execute the application 
+        RadiometricIndices.ExecuteAndWriteOutput()
+        
+    def concatenate(self, list_im, output_image):   
+        """Concatenate a list of images of the same size into a single multi-channel one,
+        using the ConcatenateImages OTB application
+        
+        list_im : a list of raster instances
+        output_image : path and name of the output image
+        """
+        # Creates a new list of the path image from the list of raster instances
+        list_path = [self.filename]
+                
+        list_path.extend([im.filename for im in list_im])
+        
+        # The following line creates an instance of the ConcatenateImages application 
+        ConcatenateImages = otbApplication.Registry.CreateApplication("ConcatenateImages") 
+         
+        # The following lines set all the application parameters: 
+        ConcatenateImages.SetParameterStringList("il", list_path) 
+         
+        ConcatenateImages.SetParameterString("out", output_image) 
+         
+        # The following line execute the application 
+        ConcatenateImages.ExecuteAndWriteOutput()
+    
+    
+    
