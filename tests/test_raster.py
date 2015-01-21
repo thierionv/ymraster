@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import unittest
-import unittest.mock
+import mock
 
 from ymraster import Raster
 import numpy as np
@@ -15,17 +15,20 @@ class TestRealRaster(unittest.TestCase):
 
     def test_should_get_attr_values(self):
         self.assertEqual(self.raster.filename, self.filename)
-        self.assertEqual(self.raster.width, 791)
-        self.assertEqual(self.raster.height, 718)
-        self.assertEqual(self.raster.number_bands, 3)
-        self.assertRegexpMatches(str(self.raster.crs), r'"EPSG", *"7030"')
-        self.assertEqual(self.raster.topleft_x, 101985.0)
-        self.assertEqual(self.raster.topleft_y, 2.826915e+06)
-        self.assertAlmostEqual(self.raster.pixel_width, 300.038, places=3)
-        self.assertAlmostEqual(self.raster.pixel_height, -300.042, places=3)
-        self.assertEqual(self.raster.idx_blue, 0)
-        self.assertEqual(self.raster.idx_green, 1)
-        self.assertEqual(self.raster.idx_red, 2)
+        self.assertEqual(self.raster.meta['count'], 3)
+        self.assertEqual(self.raster.meta['crs'],
+                         {'init': u'epsg:32618'})
+        self.assertEqual(self.raster.meta['dtype'], 'uint8')
+        self.assertEqual(self.raster.meta['driver'], u'GTiff')
+        self.assertEqual(self.raster.meta['transform'], (101985.0,
+                                                         300.0379266750948,
+                                                         0.0,
+                                                         2826915.0,
+                                                         0.0,
+                                                         -300.041782729805))
+        self.assertEqual(self.raster.meta['height'], 718)
+        self.assertEqual(self.raster.meta['width'], 791)
+        self.assertEqual(self.raster.meta['nodata'], 0.0)
 
 
 class TestRasterIndices(unittest.TestCase):
@@ -33,12 +36,8 @@ class TestRasterIndices(unittest.TestCase):
     def setUp(self):
         self.filename = 'tests/data/RGB.byte.tif'
         self.raster = Raster(self.filename, 'blue', 'green', 'red')
-        self.raster.array = unittest.mock.Mock(
-            return_value=np.arange(1, 28).reshape(3, 3, 4))
-        self.raster.idx_green = unittest.mock.Mock(return_value=0)
-        self.raster.idx_red = unittest.mock.Mock(return_value=1)
-        self.raster.idx_infrared = unittest.mock.Mock(return_value=1)
-        self.raster.idx_infrared = unittest.mock.Mock(return_value=1)
+        self.raster.array = mock.Mock(
+            return_value=np.arange(1, 37).reshape(3, 3, 4))
 
     def test_should_compute_correct_ndvi(self):
         self.assertEqual(self.raster.filename, self.filename)
