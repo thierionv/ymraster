@@ -11,7 +11,7 @@ This module contains classes for manipulating raster images. It is based on:
     * NumPy_ for computations,
 
     * rasterio_ for reading and writing raster efficiently
-    
+
     * OTB_ for merge, concatenate and segmentation operations
 
 :: _GDAL: http://gdal.org/
@@ -26,17 +26,31 @@ The ``Raster`` class
 The ``Raster`` class define an Image readed from a file.
 """
 
-from osgeo import gdal
+# from osgeo import gdal
 import numpy as np
 import rasterio
 
-# Gérer plus tard les chemins d'accès qui ne sont pas les mêmes pour toutes les
-#machines
+# TODO: Gérer plus tard les chemins d'accès qui ne sont pas les mêmes pour
+# toutes les machines
 import os
 import sys
 sys.path.append('/usr/lib/otb/python')
 os.environ["ITK_AUTOLOAD_PATH"] = "/usr/lib/otb/applications"
-import otbApplication 
+import otbApplication
+
+
+def _save_array(array, out_filename, meta):
+    """Write an NumPy array to an image file
+
+    :param array: the NumPy array to save
+    :param out_filename: path to the file to write in
+    :param meta: metadata about the image (height, size, data type (int16,
+    float64, etc.), projection, ...)
+    """
+    with rasterio.drivers():
+        with rasterio.open(out_filename, 'w', **meta) as raster:
+            for i, band in enumerate(array):
+                raster.write_band(i + 1, band)
 
 
 class Raster():
@@ -61,19 +75,9 @@ class Raster():
         self.__dict__.update({'idx_' + band: i for i, band in enumerate(bands)})
 
         # Read information from image
-        ds = gdal.Open(filename, gdal.GA_ReadOnly)
-        assert ds is not None, \
-            'Error in reading {}. Check file name and permissions'.format(
-                filename)
-        self.width = ds.RasterXSize
-        self.height = ds.RasterYSize
-        self.number_bands = ds.RasterCount
-        self.crs = ds.GetProjection()
-        self.geotransform = ds.GetGeoTransform()
-        self.topleft_x = self.geotransform[0]
-        self.topleft_y = self.geotransform[3]
-        self.pixel_width = self.geotransform[1]
-        self.pixel_height = self.geotransform[5]
+        with rasterio.drivers():
+            with rasterio.open(self.filename) as raster:
+                self.meta = raster.meta
 
     def array(self):
         """Return a Numpy array corresponding to the image"""
@@ -99,13 +103,6 @@ class Raster():
         band_red = np.where(band_infrared + band_red == 0, 1, band_red)
         return (band_infrared - band_red) / (band_infrared + band_red)
 
-    def ndvi(self, out_filename):
-        """Return the Normlized Difference Vegetation Index (NDVI) of the image
-
-        :param outfilename: path to the desired file where data is written
-        """
-        ndvi_array = self.ndvi_array()
-
     def ndmi_array(self):
         """Return the Normalized Difference Moisture Index (NDMI) of the image
         """
@@ -124,72 +121,48 @@ class Raster():
         band_green = np.where(band_midred + band_green == 0, 1, band_green)
         return (band_green - band_midred) / (band_green + band_midred)
 
-    def fusion (self, pan, output_image):
-        """ Write the merge result between the two images of a bundle, using 
+    def fusion(self, pan, output_image):
+        """ Write the merge result between the two images of a bundle, using
         the BundleToPerfectSensor OTB application
-        
-        pan : a Raster instance of the panchromatic image 
+
+        pan : a Raster instance of the panchromatic image
         output_image : path and name of the output image
         """
-         
-        # The following line creates an instance of the Pansharpening application 
-        Pansharpening = otbApplication.Registry.CreateApplication("BundleToPerfectSensor") 
-         
-        # The following lines set all the application parameters: 
-        Pansharpening.SetParameterString("inp", pan.filename) 
-         
-        Pansharpening.SetParameterString("inxs", self.filename) 
-         
-        Pansharpening.SetParameterString("out", output_image) 
-        #Pansharpening.SetParameterOutputImagePixelType("out", 3) 
-         
-        # The following line execute the application 
+        Pansharpening = otbApplication.Registry.CreateApplication(
+            "BundleToPerfectSensor")
+        Pansharpening.SetParameterString("inp", pan.filename)
+        Pansharpening.SetParameterString("inxs", self.filename)
+        Pansharpening.SetParameterString("out", output_image)
+        # Pansharpening.SetParameterOutputImagePixelType("out", 3)
         Pansharpening.ExecuteAndWriteOutput()
 
-        
-    def ndvi_otb(self, output_image):
+    def ndvi(self, output_image):
         """ Write a ndvi image, using the RadiometricIndices OTB application
-        
+
         output_image : path and name of the output image
         """
-         
-        # The following line creates an instance of the RadiometricIndices application 
-        RadiometricIndices = otbApplication.Registry.CreateApplication("RadiometricIndices") 
-         
-        # The following lines set all the application parameters: 
-        RadiometricIndices.SetParameterString("in", self.filename) 
-        
-        RadiometricIndices.SetParameterInt("channels.red", self.idx_red) 
-        RadiometricIndices.SetParameterInt("channels.nir", self.idx_infrared) 
-         
-        RadiometricIndices.SetParameterStringList("list", ["Vegetation:NDVI"]) 
-        
-        RadiometricIndices.SetParameterString("out", output_image) 
-        # The following line execute the application 
+        RadiometricIndices = otbApplication.Registry.CreateApplication(
+            "RadiometricIndices")
+        RadiometricIndices.SetParameterString("in", self.filename)
+        RadiometricIndices.SetParameterInt("channels.red", self.idx_red)
+        RadiometricIndices.SetParameterInt("channels.nir", self.idx_infrared)
+        RadiometricIndices.SetParameterStringList("list", ["Vegetation:NDVI"])
+        RadiometricIndices.SetParameterString("out", output_image)
         RadiometricIndices.ExecuteAndWriteOutput()
-        
-    def concatenate(self, list_im, output_image):   
-        """Concatenate a list of images of the same size into a single multi-channel one,
-        using the ConcatenateImages OTB application
-        
+
+    def concatenate(self, list_im, output_image):
+        """Concatenate a list of images of the same size into a single
+        multi-band image,
+
         list_im : a list of raster instances
         output_image : path and name of the output image
         """
         # Creates a new list of the path image from the list of raster instances
         list_path = [self.filename]
-                
         list_path.extend([im.filename for im in list_im])
-        
-        # The following line creates an instance of the ConcatenateImages application 
-        ConcatenateImages = otbApplication.Registry.CreateApplication("ConcatenateImages") 
-         
-        # The following lines set all the application parameters: 
-        ConcatenateImages.SetParameterStringList("il", list_path) 
-         
-        ConcatenateImages.SetParameterString("out", output_image) 
-         
-        # The following line execute the application 
+
+        ConcatenateImages = otbApplication.Registry.CreateApplication(
+            "ConcatenateImages")
+        ConcatenateImages.SetParameterStringList("il", list_path)
+        ConcatenateImages.SetParameterString("out", output_image)
         ConcatenateImages.ExecuteAndWriteOutput()
-    
-    
-    
