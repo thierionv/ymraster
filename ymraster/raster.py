@@ -138,11 +138,7 @@ class Raster():
          
         # The following line execute the application 
         Pansharpening.ExecuteAndWriteOutput()
-    
-    def extract_filename(rst):
-        """Return the filename attribute of a raster instance
-        """
-        return rst.filename
+
         
     def ndvi_otb(self, output_image):
         """ Write a ndvi image, using the RadiometricIndices OTB application
@@ -155,8 +151,11 @@ class Raster():
          
         # The following lines set all the application parameters: 
         RadiometricIndices.SetParameterString("in", self.filename) 
+        
+        RadiometricIndices.SetParameterInt("channels.red", self.idx_red) 
+        RadiometricIndices.SetParameterInt("channels.nir", self.idx_infrared) 
          
-        RadiometricIndices.SetParameterString("list", "NDVI") 
+        RadiometricIndices.SetParameterStringList("list", ["Vegetation:NDVI"]) 
         
         RadiometricIndices.SetParameterString("out", output_image) 
         # The following line execute the application 
@@ -172,7 +171,7 @@ class Raster():
         # Creates a new list of the path image from the list of raster instances
         list_path = [self.filename]
                 
-        list_path.extend(map(extract_filename,list_im))
+        list_path.extend([im.filename for im in list_im])
         
         # The following line creates an instance of the ConcatenateImages application 
         ConcatenateImages = otbApplication.Registry.CreateApplication("ConcatenateImages") 
