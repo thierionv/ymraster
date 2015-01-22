@@ -215,19 +215,25 @@ class Raster():
         ConcatenateImages.ExecuteAndWriteOutput()
 
     def lsms_smoothing(self, output_filtered_image, spatialr, ranger, maxiter,
-                       output_spatial_image=''):
-        """First step of the segmentation: perform a mean shift fitlering,
-        using the MeanShiftSmoothing otb application
+                       thres, rangeramp, output_spatial_image ):
+        """First step of LSMS : perform a mean shift fitlering, using
+        the MeanShiftSmoothing otb application. It returns two raster instances
+        corresponding to the filtered image and the spatial image
 
-        output_filtered_image : path and name of the output image filtered
-        output_spatial_image : path and name of the output spatial image, the
-        default value is an empty string, as this parameter is optional in
-        MeanSiftSmoothing application
+        output_filtered_image : path and name of the output image filtered to be
+        written
+        output_spatial_image : path and name of the output spatial image to be
+        written
         spatialr : Int, Spatial radius of the neighborhooh
         ranger: Float, Range radius defining the radius (expressed in radiometry
         unit) in the multi-spectral space.
         maxiter : Int, Maximum number of iterations of the algorithm used in
             MeanSiftSmoothing application
+        thres : Float, Mode convergence threshold #TOCOMPLETE
+        rangeramp : Float, Range radius coefficient: This coefficient makes
+        dependent
+            the ranger of the colorimetry of the filtered pixel :
+                y = rangeramp*x+ranger.
         """
 
         # TODO : fix the paramaters and provide the posibility to the user to
@@ -245,13 +251,40 @@ class Raster():
         MeanShiftSmoothing.SetParameterInt("maxiter", maxiter)
         MeanShiftSmoothing.ExecuteAndWriteOutput()
 
-    def lsms_seg(self, input_pos_img, output_image, spatialr, ranger):
-        """Second step of the segmentation: produce a labeled image with
-        different clusters, using the LSMSSegmentation otb application
+    def lsms_seg (self,input_pos_img, output_seg_image, spatialr, ranger):
+        """Second step of LSMS : produce a labeled image with different clusters,
+        according to the range and spatial proximity of the pixels, using the LSMSSegmentation
+        otb application. It returns a raster instance of the segmented image.
 
-        input_pos_img : Raster instance of a spatial image, which may have been
-        created in the smoothing step
-        output_image : path and name of the output labeled image
+        input_pos_img : Raster instance of a spatial image, which may have been created in the smoothing step
+        output_seg_image : path and name of the output segmented image to be written
+        #TODO : fix the paramaters and provide the posibility to the user to set them
+
+        # The following line creates an instance of the MeanShiftSmoothing application
+        MeanShiftSmoothing = otbApplication.Registry.CreateApplication("MeanShiftSmoothing")
+
+        # The following lines set all the application parameters:
+        MeanShiftSmoothing.SetParameterString("in", self.filename)
+
+        MeanShiftSmoothing.SetParameterString("fout", output_filtered_image)
+
+        MeanShiftSmoothing.SetParameterString("foutpos", output_spatial_image)
+
+        MeanShiftSmoothing.SetParameterInt("spatialr", spatialr)
+
+        MeanShiftSmoothing.SetParameterFloat("ranger", ranger)
+
+        MeanShiftSmoothing.SetParameterFloat("thres", thres)
+
+        MeanShiftSmoothing.SetParameterFloat("rangeramp", rangeramp)
+
+        MeanShiftSmoothing.SetParameterInt("maxiter", maxiter)
+
+        # The following line execute the application
+        MeanShiftSmoothing.ExecuteAndWriteOutput()
+
+        return Raster(output_filtered_image), Raster(output_spatial_image);
+
         spatialr : Int, Spatial radius of the neighborhooh
         ranger: Float, Range radius defining the radius (expressed in radiometry
         unit) in the multi-spectral space.
@@ -260,10 +293,97 @@ class Raster():
             "LSMSSegmentation")
         LSMSSegmentation.SetParameterString("in", self.filename)
         LSMSSegmentation.SetParameterString("inpos", input_pos_img.filename)
-        LSMSSegmentation.SetParameterString("out", output_image)
+        LSMSSegmentation.SetParameterString("out", output_seg_image)
         LSMSSegmentation.SetParameterFloat("ranger", ranger)
         LSMSSegmentation.SetParameterFloat("spatialr", spatialr)
         LSMSSegmentation.SetParameterInt("minsize", 0)
         LSMSSegmentation.SetParameterInt("tilesizex", 256)
         LSMSSegmentation.SetParameterInt("tilesizey", 256)
         LSMSSegmentation.ExecuteAndWriteOutput()
+
+        return Raster(output_seg_image)
+
+    def lsms_merging(self, in_smooth, output_merged, minsize):
+        """Third step LSMS :  merge regions whose size in pixels is lower
+        than minsize parameter with the adjacent regions with the adjacent region with closest
+        radiometry and acceptable size, using the LSMSSmallRegionsMerging otb application.
+        It returns a Raster instance of the merged image.
+
+        in_smooth : Raster instance of the smoothed image, resulting from the step 1
+        output_merged : path and name of the output merged segmented image to be written
+        minsize : Int, minimum size of a label
+        """
+
+        # The following line creates an instance of the LSMSSmallRegionsMerging application
+        LSMSSmallRegionsMerging = otbApplication.Registry.CreateApplication("LSMSSmallRegionsMerging")
+
+        # The following lines set all the application parameters:
+        LSMSSmallRegionsMerging.SetParameterString("in", in_smooth.filename)
+
+        LSMSSmallRegionsMerging.SetParameterString("inseg", self.filename)
+
+        LSMSSmallRegionsMerging.SetParameterString("out", output_merged)
+
+        LSMSSmallRegionsMerging.SetParameterInt("minsize", minsize)
+
+        LSMSSmallRegionsMerging.SetParameterInt("tilesizex", 256)
+
+        LSMSSmallRegionsMerging.SetParameterInt("tilesizey", 256)
+
+        # The following line execute the application
+        LSMSSmallRegionsMerging.ExecuteAndWriteOutput()
+
+        return Raster(output_merged)
+
+    def lsms_vectorisation(self, in_image, output_vector):
+        """Final step of LSMS : convert a label image to a GIS vector file containing
+        one polygon per segment, using the LSMSVectorization otb application
+
+        in_image : Raster instance of the image
+        output_vector : path and name of the output vector file ( ex: "vector.shp")
+            to be written
+        """
+        # The following line creates an instance of the LSMSVectorization application
+        LSMSVectorization = otbApplication.Registry.CreateApplication("LSMSVectorization")
+
+        # The following lines set all the application parameters:
+        LSMSVectorization.SetParameterString("in", in_image.filename)
+
+        LSMSVectorization.SetParameterString("inseg", self.filename)
+
+        LSMSVectorization.SetParameterString("out", output_vector)
+
+        LSMSVectorization.SetParameterInt("tilesizex", 256)
+
+        LSMSVectorization.SetParameterInt("tilesizey", 256)
+
+        # The following line execute the application
+        LSMSVectorization.ExecuteAndWriteOutput()
+
+    def lsms(self, spatialr, ranger, maxiter, thres, rangeramp, output_filtered_image, output_spatial_image, output_seg_image, output_merged, minsize, output_vector, m_step = True):
+        """
+
+        """
+
+        img_smoothed, img_pos = self.lsms_smoothing(output_filtered_image, spatialr, ranger, maxiter, thres, rangeramp, output_spatial_image)
+
+        print "smoothing step has been realized succesfully"
+
+        img_seg = img_smoothed.lsms_seg(img_pos, output_seg_image, spatialr, ranger)
+
+        print "segmentation step has been realized succesfully"
+
+        if m_step :
+            img_merged = img_seg.lsms_merging(img_smoothed, output_merged, minsize)
+
+            print "merging step has been realized succesfully"
+
+            img_merged.lsms_vectorisation(self, output_vector)
+
+            print "vectorisation step has been realized succesfully"
+
+        else:
+
+            img_seg.lsms_vectorisation(self, output_vector)
+
+            print "vectorisation step has been realized succesfully"
