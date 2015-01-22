@@ -33,6 +33,7 @@ import rasterio
 # TODO: Gérer plus tard les chemins d'accès qui ne sont pas les mêmes pour
 # toutes les machines
 import os
+from tempfile import gettempdir
 import sys
 sys.path.append('/usr/lib/otb/python')
 os.environ["ITK_AUTOLOAD_PATH"] = "/usr/lib/otb/applications"
@@ -98,32 +99,27 @@ class Raster():
                     array[:, :, i] = img.read_band(i+1)
         return array
 
-    def ndvi_array(self):
-        """Return the Normlized Difference Vegetation Index (NDVI) of the image
-        """
-        array = self.array()
-        band_red = array[:, :, self.idx_red]
-        band_infrared = array[:, :, self.idx_infrared]
-        band_red = np.where(band_infrared + band_red == 0, 1, band_red)
-        return (band_infrared - band_red) / (band_infrared + band_red)
+    def remove_band(self, idx, out_filename):
+        """Write a new image with the band at the given index removed
 
-    def ndmi_array(self):
-        """Return the Normalized Difference Moisture Index (NDMI) of the image
+        :param idx: index of the band to remove (starts at 0)
+        :param out_filename: path to the output file
         """
-        array = self.array()
-        band_infrared = array[:, :, self.idx_infrared]
-        band_midred = array[:, :, self.idx_midred]
-        band_infrared = np.where(band_midred + band_infrared == 0, 1,
-                                 band_infrared)
-        return (band_infrared - band_midred) / (band_infrared + band_midred)
-
-    def ndsi_array(self):
-        """Return the Normalized Difference Snow Index (NDSI) of the image"""
-        array = self.array()
-        band_green = array[:, :, self.idx_green]
-        band_midred = array[:, :, self.idx_midred]
-        band_green = np.where(band_midred + band_green == 0, 1, band_green)
-        return (band_green - band_midred) / (band_green + band_midred)
+        SplitImage = otbApplication.Registry.CreateApplication("SplitImage")
+        SplitImage.SetParameterString("in", self.filename)
+        SplitImage.SetParameterString("out", os.path.join(gettempdir(),
+                                                          'splitted.tif'))
+        SplitImage.ExecuteAndWriteOutput()
+        list_path = [os.path.join(gettempdir(), 'splitted_{}.tif'.format(i))
+                     for i in range(self.meta['count'])
+                     if i != idx]
+        ConcatenateImages = otbApplication.Registry.CreateApplication(
+            "ConcatenateImages")
+        ConcatenateImages.SetParameterStringList("il", list_path)
+        ConcatenateImages.SetParameterString("out", out_filename)
+        ConcatenateImages.ExecuteAndWriteOutput()
+        for i in range(self.meta['count']):
+            os.remove(os.path.join(gettempdir(), 'splitted_{}.tif'.format(i)))
 
     def fusion(self, pan, output_image):
         """ Write the merge result between the two images of a bundle, using
