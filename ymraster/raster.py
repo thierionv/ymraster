@@ -44,16 +44,17 @@ def _save_array(array, out_filename, meta):
 
     :param array: the NumPy array to save
     :param out_filename: path to the file to write in
-    :param meta: metadata about the image (height, size, data type (int16,
+    :param meta: dict about the image (height, size, data type (int16,
     float64, etc.), projection, ...)
     """
     with rasterio.drivers():
         with rasterio.open(out_filename, 'w', **meta) as raster:
-            if meta['count'] == 1:
+            number_bands = meta['count']
+            if number_bands == 1:
                 raster.write_band(1, array)
             else:
-                for i, band in enumerate(array):
-                    raster.write_band(i+1, band)
+                for i in range(number_bands):
+                    raster.write_band(i+1, array[:, :, i])
 
 
 class Raster():
