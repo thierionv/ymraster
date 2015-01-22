@@ -47,6 +47,8 @@ def _save_array(array, out_filename, meta):
     :param meta: dict about the image (height, size, data type (int16,
     float64, etc.), projection, ...)
     """
+    if array.ndim >= 4:
+        raise NotImplementedError('Do not support 4+-dimensional arrays')
     with rasterio.drivers():
         with rasterio.open(out_filename, 'w', **meta) as raster:
             number_bands = meta['count']
