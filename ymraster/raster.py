@@ -140,19 +140,66 @@ class Raster():
         # Pansharpening.SetParameterOutputImagePixelType("out", 3)
         Pansharpening.ExecuteAndWriteOutput()
 
-    def ndvi(self, output_image):
-        """ Write a ndvi image, using the RadiometricIndices OTB application
+    def ndvi(self, out_filename, idx_red=None, idx_nir=None):
+        """Write the NDVI of the image into the given output file and
+        return the corresponding Raster object
 
-        output_image : path and name of the output image
+        :param out_filename: path to the output file
+        :param idx_red: index of the red band
+        :param idx_nir: index of the near infrared band
         """
         RadiometricIndices = otbApplication.Registry.CreateApplication(
             "RadiometricIndices")
         RadiometricIndices.SetParameterString("in", self.filename)
-        RadiometricIndices.SetParameterInt("channels.red", self.idx_red)
-        RadiometricIndices.SetParameterInt("channels.nir", self.idx_infrared)
+        RadiometricIndices.SetParameterInt("channels.red", idx_red)
+        RadiometricIndices.SetParameterInt("channels.nir", idx_nir)
         RadiometricIndices.SetParameterStringList("list", ["Vegetation:NDVI"])
-        RadiometricIndices.SetParameterString("out", output_image)
+        RadiometricIndices.SetParameterString("out", out_filename)
         RadiometricIndices.ExecuteAndWriteOutput()
+
+        return Raster(out_filename)
+
+    def ndwi(self, out_filename, idx_nir, idx_mir):
+        """Write the NDWI of the image into the given output file and
+        return the corresponding Raster object
+
+        :param out_filename: path to the output file
+        :param idx_nir: index of the near infrared band
+        :param idx_mir: index of the middle infrared band
+        """
+        RadiometricIndices = otbApplication.Registry.CreateApplication(
+            "RadiometricIndices")
+        RadiometricIndices.SetParameterString("in", self.filename)
+        RadiometricIndices.SetParameterInt("channels.nir", idx_nir)
+        RadiometricIndices.SetParameterInt("channels.mir", idx_mir)
+        RadiometricIndices.SetParameterStringList("list", ["Water:NDWI"])
+        RadiometricIndices.SetParameterString("out", out_filename)
+        RadiometricIndices.ExecuteAndWriteOutput()
+
+        return Raster(out_filename)
+
+    ndmi = ndwi
+
+    def mndwi(self, out_filename, idx_green, idx_mir):
+        """Write the MNDWI of the image into the given output file and
+        return the corresponding Raster object
+
+        :param out_filename: path to the output file
+        :param idx_green: index of the green band
+        :param idx_mir: index of the middle infrared band
+        """
+        RadiometricIndices = otbApplication.Registry.CreateApplication(
+            "RadiometricIndices")
+        RadiometricIndices.SetParameterString("in", self.filename)
+        RadiometricIndices.SetParameterInt("channels.green", idx_green)
+        RadiometricIndices.SetParameterInt("channels.mir", idx_mir)
+        RadiometricIndices.SetParameterStringList("list", ["Water:MNDWI"])
+        RadiometricIndices.SetParameterString("out", out_filename)
+        RadiometricIndices.ExecuteAndWriteOutput()
+
+        return Raster(out_filename)
+
+    ndsi = mndwi
 
     def concatenate(self, list_im, output_image):
         """Concatenate a list of images of the same size into a single

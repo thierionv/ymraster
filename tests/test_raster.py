@@ -7,6 +7,7 @@ import tempfile
 from ymraster import _save_array, Raster
 import numpy as np
 
+import re
 import subprocess
 
 
@@ -38,7 +39,7 @@ class TestArrayToRaster(unittest.TestCase):
                                  'StdDev={1:.3f}'.format(self.value, 0))
 
     def setUp(self):
-        self.f = tempfile.NamedTemporaryFile()
+        self.f = tempfile.NamedTemporaryFile(suffix='.tif')
         self.name = self.f.name
         self.driver = u'GTiff'
 
@@ -150,6 +151,39 @@ class TestRasterArrayFunctions(unittest.TestCase):
 
     def test_should_compute_correct_ndvi(self):
         self.assertEqual(self.raster.filename, self.filename)
+
+
+class TestOtbFunctions(unittest.TestCase):
+
+    def _check_normalized_index(self):
+        self.assertEqual(self.result.meta['count'], 1)
+        info = subprocess.check_output(["gdalinfo", "-stats",
+                                        self.f.name]).decode('utf-8')
+        self.assertRegexpMatches(info, u'Driver: GTif')
+        self.assertRegexpMatches(info, u'Size is 66, 56')
+        self.assertRegexpMatches(info, u'Type=Float32')
+        match = re.search('Minimum=(-*[0-9\.]+), Maximum=(-*[0-9\.]+),', info)
+        min = float(match.group(1))
+        max = float(match.group(2))
+        self.assertGreaterEqual(min, -1)
+        self.assertLessEqual(max, 1)
+
+    def setUp(self):
+        self.filename = 'tests/data/l8_20130714.tif'
+        self.raster = Raster(self.filename)
+        self.f = tempfile.NamedTemporaryFile(suffix='.tif')
+
+    def test_should_compute_ndvi(self):
+        self.result = self.raster.ndvi(self.f.name, 4, 5)
+        self._check_normalized_index()
+
+    def test_should_compute_ndwi(self):
+        self.result = self.raster.ndwi(self.f.name, 5, 6)
+        self._check_normalized_index()
+
+    def test_should_compute_mndwi(self):
+        self.result = self.raster.ndwi(self.f.name, 3, 6)
+        self._check_normalized_index()
 
 
 def suite():
