@@ -12,29 +12,83 @@ import subprocess
 
 class TestArrayToRaster(unittest.TestCase):
 
+    def _execute_save_array(self):
+        if self.n_bands == 1:
+            a = np.ones((self.height, self.width),
+                        dtype=self.dtype) * self.value
+        else:
+            a = np.ones((self.height, self.width, self.n_bands),
+                        dtype=self.dtype) * self.value
+        meta = {'driver': self.driver,
+                'width': self.width,
+                'height': self.height,
+                'count': self.n_bands,
+                'dtype': self.dtype}
+        _save_array(a, self.name, meta)
+
+    def _check_output_image(self):
+        self.assertRegexpMatches(self.info, u'Driver: {}'.format(self.driver))
+        self.assertRegexpMatches(self.info, u'Size is {}, {}'.format(
+            self.width,
+            self.height))
+        self.assertRegexpMatches(self.info, u'Type=UInt16')
+        self.assertRegexpMatches(self.info, u'Minimum={0:.3f}, '
+                                 'Maximum={0:.3f}, '
+                                 'Mean={0:.3f}, '
+                                 'StdDev={1:.3f}'.format(self.value, 0))
+
     def setUp(self):
         self.f = tempfile.NamedTemporaryFile()
         self.name = self.f.name
+        self.driver = u'GTiff'
 
-    def test_should_write_one_band_image(self):
-        width = 3
-        height = 3
-        n_bands = 1
-        dtype = np.uint16
-        value = 65535
-        a = np.ones((width, height), dtype=dtype) * value
-        meta = {'driver': u'GTiff', 'width': width, 'height': height,
-                'count': n_bands, 'dtype': dtype}
-        _save_array(a, self.name, meta)
-        stats = subprocess.check_output(["gdalinfo", "-stats",
-                                         self.name]).decode('utf-8')
-        self.assertRegexpMatches(stats, u'Driver: GTiff')
-        self.assertRegexpMatches(stats, u'Size is {}, {}'.format(height, width))
-        self.assertRegexpMatches(stats, u'Type=UInt16')
-        self.assertRegexpMatches(stats, u'Minimum=65535.000, '
-                                 'Maximum=65535.000, '
-                                 'Mean=65535.000, '
-                                 'StdDev=0.000')
+    def test_should_write_one_band_square_uint16_image(self):
+        self.width = 200
+        self.height = 200
+        self.n_bands = 1
+        self.dtype = np.uint16
+        self.value = 65535
+        self._execute_save_array()
+        self.info = subprocess.check_output(["gdalinfo", "-stats",
+                                             self.name]).decode('utf-8')
+        self._check_output_image()
+
+    def test_should_write_three_band_square_uint16_image(self):
+        self.width = 400
+        self.height = 400
+        self.n_bands = 3
+        self.dtype = np.uint16
+        self.value = 65535
+        self._execute_save_array()
+        self.info = subprocess.check_output(["gdalinfo", "-stats",
+                                             self.name]).decode('utf-8')
+        self._check_output_image()
+
+    def test_should_write_three_band_rectangle_uint16_image(self):
+        self.width = 800
+        self.height = 600
+        self.n_bands = 3
+        self.dtype = np.uint16
+        self.value = 65535
+        self._execute_save_array()
+        self.info = subprocess.check_output(["gdalinfo", "-stats",
+                                             self.name]).decode('utf-8')
+        self._check_output_image()
+
+    def test_should_raise_value_error_if_value_out_of_range(self):
+        self.width = 3
+        self.height = 3
+        self.n_bands = 1
+        self.dtype = np.uint16
+        self.value = 65536
+        a = np.ones((self.height, self.width, self.n_bands),
+                    dtype=self.dtype) * self.value
+        meta = {'driver': self.driver,
+                'width': self.width,
+                'height': self.height,
+                'count': self.n_bands,
+                'dtype': self.dtype}
+        self.assertRaises(ValueError, _save_array, a, self.name, meta)
 
 
 class TestRealRaster(unittest.TestCase):
