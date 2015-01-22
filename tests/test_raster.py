@@ -110,7 +110,7 @@ class TestRealRaster(unittest.TestCase):
 
     def setUp(self):
         self.filename = 'tests/data/RGB.byte.tif'
-        self.raster = Raster(self.filename, 'blue', 'green', 'red')
+        self.raster = Raster(self.filename)
 
     def test_should_get_attr_values(self):
         self.assertEqual(self.raster.filename, self.filename)
@@ -129,12 +129,22 @@ class TestRealRaster(unittest.TestCase):
         self.assertEqual(self.raster.meta['width'], 791)
         self.assertEqual(self.raster.meta['nodata'], 0.0)
 
+    def test_should_get_array(self):
+        array = self.raster.array()
+        self.assertEqual(array.ndim, 3)
+        self.assertEqual(array.shape, (718, 791, 3))
+        self.assertEqual(array.dtype, np.uint8)
 
-class TestRasterIndices(unittest.TestCase):
+    def test_should_raise_io_error_on_missing_file(self):
+        filename = 'tests/data/not_exists.tif'
+        self.assertRaises(IOError, Raster, filename)
+
+
+class TestRasterArrayFunctions(unittest.TestCase):
 
     def setUp(self):
         self.filename = 'tests/data/RGB.byte.tif'
-        self.raster = Raster(self.filename, 'blue', 'green', 'red')
+        self.raster = Raster(self.filename)
         self.raster.array = mock.Mock(
             return_value=np.arange(1, 37).reshape(3, 3, 4))
 
@@ -146,7 +156,7 @@ def suite():
     suite = unittest.TestSuite()
     load_from = unittest.defaultTestLoader.loadTestsFromTestCase
     suite.addTests(load_from(TestRealRaster))
-    suite.addTests(load_from(TestRasterIndices))
+    suite.addTests(load_from(TestRasterArrayFunctions))
     return suite
 
 
