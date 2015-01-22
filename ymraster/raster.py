@@ -69,7 +69,7 @@ class Raster():
 
     """
 
-    def __init__(self, filename, *bands):
+    def __init__(self, filename):
         """Create a new raster object read from a filename, and compute
         useful properties
 
@@ -77,8 +77,6 @@ class Raster():
         :param bands: band names (eg. 'blue', 'red', 'infrared, etc.)
         """
         self.filename = filename
-        # Create 'idx_blue', 'idx_green', etc. attributes
-        self.__dict__.update({'idx_'+band: i for i, band in enumerate(bands)})
 
         # Read information from image
         with rasterio.drivers():
@@ -88,15 +86,15 @@ class Raster():
     def array(self):
         """Return a Numpy array corresponding to the image"""
         # Initialize an empty array of correct size and type
-        array = np.empty((self.height,
-                          self.width,
-                          self.number_bands),
-                         dtype='float64')
+        array = np.empty((self.meta['height'],
+                          self.meta['width'],
+                          self.meta['count']),
+                         dtype=self.meta['dtype'])
 
         # Fill the array
         with rasterio.drivers(CPL_DEBUG=True):  # Register GDAL format drivers
             with rasterio.open(self.filename) as img:
-                for i in range(self.number_bands):
+                for i in range(self.meta['count']):
                     array[:, :, i] = img.read_band(i+1)
         return array
 
