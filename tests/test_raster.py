@@ -90,6 +90,21 @@ class TestArrayToRaster(unittest.TestCase):
                 'dtype': self.dtype}
         self.assertRaises(ValueError, _save_array, a, self.name, meta)
 
+    def test_should_raise_not_implemented_if_array_four_dimensional(self):
+        self.width = 3
+        self.height = 3
+        self.n_bands = 3
+        self.dtype = np.uint16
+        self.value = 65535
+        a = np.ones((self.height, self.width, self.n_bands, 1),
+                    dtype=self.dtype) * self.value
+        meta = {'driver': self.driver,
+                'width': self.width,
+                'height': self.height,
+                'count': self.n_bands,
+                'dtype': self.dtype}
+        self.assertRaises(NotImplementedError, _save_array, a, self.name, meta)
+
 
 class TestRealRaster(unittest.TestCase):
 
