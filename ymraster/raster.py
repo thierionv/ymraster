@@ -60,6 +60,65 @@ def _save_array(array, out_filename, meta):
                     raster.write_band(i+1, array[:, :, i])
 
 
+class IdDefaultDict(dict):
+    """A dictionary where trying to reach a missing key does create the key with
+    value equal to itself"""
+
+    def __missing__(self, key):
+        self[key] = key
+        return self[key]
+
+
+class DataType(object):
+    """Abstract class for a data type (int16, int32, float32, etc.)"""
+
+    data_type_match = IdDefaultDict()
+
+    def __set__(self, instance, value):
+        instance.otb_dtype = self.data_type_match[value]
+
+    def __get__(self, instance, owner):
+        revert_match = {v: k for k, v in self.data_type_match.iteritems()}
+        return revert_match[instance.otb_dtype]
+
+
+class StrDataType(DataType):
+    """Represent a data type given in string format (eg. 'int16', 'int32',
+    'float32', etc.)"""
+
+    data_type_match = {'uint8': otbApplication.ImagePixelType_uint8,
+                       'uint16': otbApplication.ImagePixelType_uint16,
+                       'uint32': otbApplication.ImagePixelType_uint32,
+                       'int16': otbApplication.ImagePixelType_int16,
+                       'int32': otbApplication.ImagePixelType_int32,
+                       'float32': otbApplication.ImagePixelType_float,
+                       'float64': otbApplication.ImagePixelType_double}
+
+
+class OtbDataType(DataType):
+    """Represent a data type for orfeo-toolbox
+    (eg. otbApplication.ImagePixelType_uint16)"""
+
+    def __set__(self, instance, value):
+        instance._otb_type = value
+
+    def __get__(self, instance, owner):
+        return instance._otb_type
+
+
+class RasterDataType(object):
+    """The usable class to manage raster data types"""
+
+    str_dtype = StrDataType()
+    otb_dtype = OtbDataType()
+
+    def __init__(self, str_dtype=None, otb_dtype=None):
+        if str_dtype:
+            self.str_dtype = str_dtype
+        elif otb_dtype:
+            self.otb_dtype = otb_dtype
+
+
 class Raster():
     """Represents a raster image that was read from a file
 
@@ -83,6 +142,8 @@ class Raster():
         with rasterio.drivers():
             with rasterio.open(self.filename) as raster:
                 self.meta = raster.meta
+                dtype = RasterDataType(str_dtype=self.meta['dtype'])
+                self.meta['otb_dtype'] = dtype.otb_dtype
 
     def array(self):
         """Return a Numpy array corresponding to the image"""
@@ -105,11 +166,16 @@ class Raster():
         :param idx: index of the band to remove (starts at 0)
         :param out_filename: path to the output file
         """
+        # Split the N-bands image into N mono-band images (in temp folder)
         SplitImage = otbApplication.Registry.CreateApplication("SplitImage")
         SplitImage.SetParameterString("in", self.filename)
         SplitImage.SetParameterString("out", os.path.join(gettempdir(),
                                                           'splitted.tif'))
+        SplitImage.SetParameterOutputImagePixelType("out",
+                                                    self.meta['otb_dtype'])
         SplitImage.ExecuteAndWriteOutput()
+
+        # Concatenate the mono-band images without the unwanted band
         list_path = [os.path.join(gettempdir(), 'splitted_{}.tif'.format(i))
                      for i in range(self.meta['count'])
                      if i != idx]
@@ -117,9 +183,16 @@ class Raster():
             "ConcatenateImages")
         ConcatenateImages.SetParameterStringList("il", list_path)
         ConcatenateImages.SetParameterString("out", out_filename)
+        ConcatenateImages.SetParameterOutputImagePixelType("out",
+                                                           self.meta[
+                                                               'otb_dtype'])
         ConcatenateImages.ExecuteAndWriteOutput()
+
+        # Delete mono-band images in temp folder
         for i in range(self.meta['count']):
             os.remove(os.path.join(gettempdir(), 'splitted_{}.tif'.format(i)))
+
+        return Raster(out_filename)
 
     def fusion(self, pan, output_image):
         """ Write the merge result between the two images of a bundle, using

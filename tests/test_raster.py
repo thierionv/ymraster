@@ -173,6 +173,21 @@ class TestOtbFunctions(unittest.TestCase):
         self.raster = Raster(self.filename)
         self.f = tempfile.NamedTemporaryFile(suffix='.tif')
 
+    def test_should_remove_band(self):
+        self.result = self.raster.remove_band(6, self.f.name)
+        self.assertEqual(self.result.meta['count'],
+                         self.raster.meta['count'] - 1)
+        info = subprocess.check_output(["gdalinfo", "-stats",
+                                        self.f.name]).decode('utf-8')
+        raster_info = subprocess.check_output(["gdalinfo", "-stats",
+                                               self.filename]).decode('utf-8')
+        raster_driver = re.search('(Driver: \w+)', raster_info).group(1)
+        raster_size = re.search('(Size is \d+, \d+)', raster_info).group(1)
+        raster_dtype = re.search('(Type=\w+),', raster_info).group(1)
+        self.assertRegexpMatches(info, raster_driver)
+        self.assertRegexpMatches(info, raster_size)
+        self.assertRegexpMatches(info, raster_dtype)
+
     def test_should_compute_ndvi(self):
         self.result = self.raster.ndvi(self.f.name, 4, 5)
         self._check_normalized_index()
