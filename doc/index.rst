@@ -11,6 +11,8 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
+.. automodule:: ymraster.raster
+   :members:
 
 
 Indices and tables
