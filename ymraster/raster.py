@@ -141,10 +141,10 @@ class Raster():
         
         return Raster(output_image)
 
-    def ndvi(self, out_filename, idx_red=None, idx_nir=None):
+    def ndvi(self, out_filename, idx_red, idx_nir):
         """Write the NDVI of the image into the given output file and
-        return the corresponding Raster object
-
+        return the corresponding Raster object. Indexation starts at 1.
+        
         :param out_filename: path to the output file
         :param idx_red: index of the red band
         :param idx_nir: index of the near infrared band
@@ -162,7 +162,7 @@ class Raster():
 
     def ndwi(self, out_filename, idx_nir, idx_mir):
         """Write the NDWI of the image into the given output file and
-        return the corresponding Raster object
+        return the corresponding Raster object. Indexation starts at 1.
 
         :param out_filename: path to the output file
         :param idx_nir: index of the near infrared band
@@ -183,7 +183,7 @@ class Raster():
 
     def mndwi(self, out_filename, idx_green, idx_mir):
         """Write the MNDWI of the image into the given output file and
-        return the corresponding Raster object
+        return the corresponding Raster object. Indexation starts at 1.
 
         :param out_filename: path to the output file
         :param idx_green: index of the green band
