@@ -60,6 +60,40 @@ def _save_array(array, out_filename, meta):
                     raster.write_band(i+1, array[:, :, i])
 
 
+def concatenate_images(rasters, out_filename):
+    """Write an image which is the concatenation of the given rasters in order
+
+    All bands in all input rasters must have same size
+
+    Moreover, if data types are different, then everything will be converted to
+    the default data type in OTB (_float_ currently).
+
+    :param filenames: list of Raster objects to concatenate
+    :param out_filename: path to the file to write the concatenation in
+    """
+    # Check for size and type (and that rasters list is not empty)
+    raster0 = rasters[0]
+    width, height, otb_dtype = tuple(raster0.meta[key] for key in
+                                     ['width', 'height', 'otb_dtype'])
+    same_type = True
+    for raster in rasters:
+        assert raster.meta['width'] == width \
+            and raster.meta['height'] == height, \
+            "Images have not same size : '{}' and '{}'".format(raster0, raster)
+        if raster.meta['otb_dtype'] != otb_dtype:
+            same_type = False
+
+    # Perform the concatenation
+    filenames = [raster.filename for raster in rasters]
+    ConcatenateImages = otbApplication.Registry.CreateApplication(
+        "ConcatenateImages")
+    ConcatenateImages.SetParameterStringList("il", filenames)
+    ConcatenateImages.SetParameterString("out", out_filename)
+    if same_type:
+        ConcatenateImages.SetParameterOutputImagePixelType("out", otb_dtype)
+    ConcatenateImages.ExecuteAndWriteOutput()
+
+
 class IdDefaultDict(dict):
     """A dictionary where trying to reach a missing key does create the key with
     value equal to itself"""
@@ -279,15 +313,9 @@ class Raster():
         list_im : a list of raster instances
         output_image : path and name of the output image
         """
-        # Creates a new list of the path image from the list of raster instances
-        list_path = [self.filename]
-        list_path.extend([im.filename for im in list_im])
-
-        ConcatenateImages = otbApplication.Registry.CreateApplication(
-            "ConcatenateImages")
-        ConcatenateImages.SetParameterStringList("il", list_path)
-        ConcatenateImages.SetParameterString("out", output_image)
-        ConcatenateImages.ExecuteAndWriteOutput()
+        rasters = [self]
+        rasters.extend(list_im)
+        concatenate_images(rasters, output_image)
 
         return Raster(output_image)
 
