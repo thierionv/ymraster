@@ -4,107 +4,152 @@ import unittest
 import mock
 import tempfile
 
-from ymraster import _save_array, Raster
+from ymraster import _save_array, concatenate_images, Raster
 import numpy as np
 
+import os
 import re
 import subprocess
+
+
+def _check_output_image(tester, filename, driver, width, height, number_bands,
+                        dtype, min_=None, max_=None, mean=None, stddev=None):
+    dtype_str_match = {np.uint16: 'UInt16',
+                       np.int16: 'Int16'}
+    info = subprocess.check_output(["gdalinfo", "-stats",
+                                    filename]).decode('utf-8')
+    tester.assertRegexpMatches(info, u'Driver: {}'.format(driver))
+    tester.assertRegexpMatches(info, u'Size is {}, {}'.format(width, height))
+    tester.assertEqual(len(re.findall('Band \d+ ', info)), number_bands)
+    tester.assertRegexpMatches(info, u'Type={}'.format(dtype_str_match[dtype]))
+    if min_ is not None:
+        tester.assertRegexpMatches(info, u'Minimum={:.3f}, '.format(min_))
+    if max_ is not None:
+        tester.assertRegexpMatches(info, u'Maximum={:.3f}, '.format(max_))
+    if mean is not None:
+        tester.assertRegexpMatches(info, u'Mean={:.3f}, '.format(mean))
+    if stddev is not None:
+        tester.assertRegexpMatches(info, u'StdDev={:.3f}'.format(stddev))
 
 
 class TestArrayToRaster(unittest.TestCase):
 
     def _execute_save_array(self):
-        if self.n_bands == 1:
+        if self.number_bands == 1:
             a = np.ones((self.height, self.width),
                         dtype=self.dtype) * self.value
         else:
-            a = np.ones((self.height, self.width, self.n_bands),
+            a = np.ones((self.height, self.width, self.number_bands),
                         dtype=self.dtype) * self.value
         meta = {'driver': self.driver,
                 'width': self.width,
                 'height': self.height,
-                'count': self.n_bands,
+                'count': self.number_bands,
                 'dtype': self.dtype}
-        _save_array(a, self.name, meta)
-
-    def _check_output_image(self):
-        self.assertRegexpMatches(self.info, u'Driver: {}'.format(self.driver))
-        self.assertRegexpMatches(self.info, u'Size is {}, {}'.format(
-            self.width,
-            self.height))
-        self.assertRegexpMatches(self.info, u'Type=UInt16')
-        self.assertRegexpMatches(self.info, u'Minimum={0:.3f}, '
-                                 'Maximum={0:.3f}, '
-                                 'Mean={0:.3f}, '
-                                 'StdDev={1:.3f}'.format(self.value, 0))
+        _save_array(a, self.filename, meta)
 
     def setUp(self):
-        self.f = tempfile.NamedTemporaryFile(suffix='.tif')
-        self.name = self.f.name
         self.driver = u'GTiff'
 
     def test_should_write_one_band_square_uint16_image(self):
         self.width = 200
         self.height = 200
-        self.n_bands = 1
+        self.number_bands = 1
         self.dtype = np.uint16
         self.value = 65535
+        f = tempfile.NamedTemporaryFile(suffix='.tif')
+        self.filename = f.name
         self._execute_save_array()
-        self.info = subprocess.check_output(["gdalinfo", "-stats",
-                                             self.name]).decode('utf-8')
-        self._check_output_image()
+        _check_output_image(self, self.filename, self.driver, self.width,
+                            self.height, self.number_bands, self.dtype,
+                            self.value, self.value, self.value, 0)
 
     def test_should_write_three_band_square_uint16_image(self):
         self.width = 400
         self.height = 400
-        self.n_bands = 3
+        self.number_bands = 3
         self.dtype = np.uint16
         self.value = 65535
+        f = tempfile.NamedTemporaryFile(suffix='.tif')
+        self.filename = f.name
         self._execute_save_array()
-        self.info = subprocess.check_output(["gdalinfo", "-stats",
-                                             self.name]).decode('utf-8')
-        self._check_output_image()
+        _check_output_image(self, self.filename, self.driver, self.width,
+                            self.height, self.number_bands, self.dtype,
+                            self.value, self.value, self.value, 0)
 
     def test_should_write_three_band_rectangle_uint16_image(self):
         self.width = 800
         self.height = 600
-        self.n_bands = 3
+        self.number_bands = 3
         self.dtype = np.uint16
         self.value = 65535
+        f = tempfile.NamedTemporaryFile(suffix='.tif')
+        self.filename = f.name
         self._execute_save_array()
-        self.info = subprocess.check_output(["gdalinfo", "-stats",
-                                             self.name]).decode('utf-8')
-        self._check_output_image()
+        _check_output_image(self, self.filename, self.driver, self.width,
+                            self.height, self.number_bands, self.dtype,
+                            self.value, self.value, self.value, 0)
 
     def test_should_raise_value_error_if_value_out_of_range(self):
-        self.width = 3
-        self.height = 3
-        self.n_bands = 1
-        self.dtype = np.uint16
-        self.value = 65536
-        a = np.ones((self.height, self.width, self.n_bands),
-                    dtype=self.dtype) * self.value
+        width = 3
+        height = 3
+        number_bands = 1
+        dtype = np.uint16
+        value = 65536
+        a = np.ones((height, width, number_bands), dtype=dtype) * value
         meta = {'driver': self.driver,
-                'width': self.width,
-                'height': self.height,
-                'count': self.n_bands,
-                'dtype': self.dtype}
-        self.assertRaises(ValueError, _save_array, a, self.name, meta)
+                'width': width,
+                'height': height,
+                'count': number_bands,
+                'dtype': dtype}
+        f = tempfile.NamedTemporaryFile(suffix='.tif')
+        name = f.name
+        self.assertRaises(ValueError, _save_array, a, name, meta)
 
     def test_should_raise_not_implemented_if_array_four_dimensional(self):
-        self.width = 3
-        self.height = 3
-        self.n_bands = 3
-        self.dtype = np.uint16
-        self.value = 65535
-        a = np.ones((self.height, self.width, self.n_bands, 1),
-                    dtype=self.dtype) * self.value
+        width = 3
+        height = 3
+        number_bands = 3
+        dtype = np.uint16
+        value = 65535
+        a = np.ones((height, width, number_bands, 1), dtype=dtype) * value
         meta = {'driver': self.driver,
-                'width': self.width,
-                'height': self.height,
-                'count': self.n_bands,
-                'dtype': self.dtype}
-        self.assertRaises(NotImplementedError, _save_array, a, self.name, meta)
+                'width': width,
+                'height': height,
+                'count': number_bands,
+                'dtype': dtype}
+        f = tempfile.NamedTemporaryFile(suffix='.tif')
+        name = f.name
+        self.assertRaises(NotImplementedError, _save_array, a, name, meta)
+
+
+class TestConcatenateImages(unittest.TestCase):
+
+    def setUp(self):
+        self.folder = 'tests/data'
+        self.driver = u'GTiff'
+
+    def test_should_concatenate_same_type_images(self):
+        width = 66
+        height = 56
+        number_bands = 35
+        dtype = np.int16
+        rasters = [Raster(os.path.join(self.folder, filename))
+                   for filename in os.listdir(self.folder)
+                   if filename.startswith('l8_')
+                   and filename.endswith('.tif')]
+        f = tempfile.NamedTemporaryFile(suffix='.tif')
+        filename = f.name
+        concatenate_images(rasters, filename)
+        _check_output_image(self, filename, self.driver, width, height,
+                            number_bands, dtype)
+
+    def test_should_raise_assertion_error_if_not_same_size(self):
+        rasters = [Raster(os.path.join(self.folder, 'RGB.byte.tif')),
+                   Raster(os.path.join(self.folder, 'float.tif'))]
+        f = tempfile.NamedTemporaryFile(suffix='.tif')
+        filename = f.name
+        self.assertRaises(AssertionError, concatenate_images, rasters, filename)
 
 
 class TestRealRaster(unittest.TestCase):
