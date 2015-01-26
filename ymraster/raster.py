@@ -209,9 +209,11 @@ class Raster():
         # Pansharpening.SetParameterOutputImagePixelType("out", 3)
         Pansharpening.ExecuteAndWriteOutput()
 
-    def ndvi(self, out_filename, idx_red=None, idx_nir=None):
+        return Raster(output_image)
+
+    def ndvi(self, out_filename, idx_red, idx_nir):
         """Write the NDVI of the image into the given output file and
-        return the corresponding Raster object
+        return the corresponding Raster object. Indexation starts at 1.
 
         :param out_filename: path to the output file
         :param idx_red: index of the red band
@@ -230,7 +232,7 @@ class Raster():
 
     def ndwi(self, out_filename, idx_nir, idx_mir):
         """Write the NDWI of the image into the given output file and
-        return the corresponding Raster object
+        return the corresponding Raster object. Indexation starts at 1.
 
         :param out_filename: path to the output file
         :param idx_nir: index of the near infrared band
@@ -251,7 +253,7 @@ class Raster():
 
     def mndwi(self, out_filename, idx_green, idx_mir):
         """Write the MNDWI of the image into the given output file and
-        return the corresponding Raster object
+        return the corresponding Raster object. Indexation starts at 1.
 
         :param out_filename: path to the output file
         :param idx_green: index of the green band
@@ -287,30 +289,28 @@ class Raster():
         ConcatenateImages.SetParameterString("out", output_image)
         ConcatenateImages.ExecuteAndWriteOutput()
 
+        return Raster(output_image)
+
     def lsms_smoothing(self, output_filtered_image, spatialr, ranger, maxiter,
                        thres, rangeramp, output_spatial_image ):
         """First step of LSMS : perform a mean shift fitlering, using
         the MeanShiftSmoothing otb application. It returns two raster instances
         corresponding to the filtered image and the spatial image
 
-        output_filtered_image : path and name of the output image filtered to be
-        written
-        output_spatial_image : path and name of the output spatial image to be
-        written
-        spatialr : Int, Spatial radius of the neighborhooh
-        ranger: Float, Range radius defining the radius (expressed in radiometry
-        unit) in the multi-spectral space.
-        maxiter : Int, Maximum number of iterations of the algorithm used in
-            MeanSiftSmoothing application
-        thres : Float, Mode convergence threshold #TOCOMPLETE
-        rangeramp : Float, Range radius coefficient: This coefficient makes
-        dependent
-            the ranger of the colorimetry of the filtered pixel :
-                y = rangeramp*x+ranger.
+        :param output_filtered_image : path and name of the output image
+        filtered to be written
+        :param output_spatial_image : path and name of the output spatial image
+        to be written
+        :param spatialr : Int, Spatial radius of the neighborhooh
+        :param ranger: Float, Range radius defining the radius (expressed in
+        radiometry unit) in the multi-spectral space.
+        :param maxiter : Int, Maximum number of iterations of the algorithm
+        used in MeanSiftSmoothing application
+        :param thres : Float, Mode convergence threshold #TOCOMPLETE
+        :param rangeramp : Float, Range radius coefficient: This coefficient
+        makes dependent the ranger of the colorimetry of the filtered pixel :
+        y = rangeramp*x+ranger.
         """
-
-        # TODO : fix the paramaters and provide the posibility to the user to
-        # set them
 
         MeanShiftSmoothing = otbApplication.Registry.CreateApplication(
             "MeanShiftSmoothing")
@@ -319,48 +319,26 @@ class Raster():
         MeanShiftSmoothing.SetParameterString("foutpos", output_spatial_image)
         MeanShiftSmoothing.SetParameterInt("spatialr", spatialr)
         MeanShiftSmoothing.SetParameterFloat("ranger", ranger)
-        MeanShiftSmoothing.SetParameterFloat("thres", 0.1)
-        MeanShiftSmoothing.SetParameterFloat("rangeramp", 0.1)
+        MeanShiftSmoothing.SetParameterFloat("thres", thres)
+        MeanShiftSmoothing.SetParameterFloat("rangeramp", rangeramp)
         MeanShiftSmoothing.SetParameterInt("maxiter", maxiter)
         MeanShiftSmoothing.ExecuteAndWriteOutput()
+
+        return Raster(output_filtered_image), Raster(output_spatial_image)
 
     def lsms_seg (self,input_pos_img, output_seg_image, spatialr, ranger):
         """Second step of LSMS : produce a labeled image with different clusters,
-        according to the range and spatial proximity of the pixels, using the LSMSSegmentation
-        otb application. It returns a raster instance of the segmented image.
+        according to the range and spatial proximity of the pixels, using the
+        LSMSSegmentation otb application. It returns a raster instance of the
+        segmented image.
 
-        input_pos_img : Raster instance of a spatial image, which may have been created in the smoothing step
-        output_seg_image : path and name of the output segmented image to be written
-        #TODO : fix the paramaters and provide the posibility to the user to set them
-
-        # The following line creates an instance of the MeanShiftSmoothing application
-        MeanShiftSmoothing = otbApplication.Registry.CreateApplication("MeanShiftSmoothing")
-
-        # The following lines set all the application parameters:
-        MeanShiftSmoothing.SetParameterString("in", self.filename)
-
-        MeanShiftSmoothing.SetParameterString("fout", output_filtered_image)
-
-        MeanShiftSmoothing.SetParameterString("foutpos", output_spatial_image)
-
-        MeanShiftSmoothing.SetParameterInt("spatialr", spatialr)
-
-        MeanShiftSmoothing.SetParameterFloat("ranger", ranger)
-
-        MeanShiftSmoothing.SetParameterFloat("thres", thres)
-
-        MeanShiftSmoothing.SetParameterFloat("rangeramp", rangeramp)
-
-        MeanShiftSmoothing.SetParameterInt("maxiter", maxiter)
-
-        # The following line execute the application
-        MeanShiftSmoothing.ExecuteAndWriteOutput()
-
-        return Raster(output_filtered_image), Raster(output_spatial_image);
-
-        spatialr : Int, Spatial radius of the neighborhooh
-        ranger: Float, Range radius defining the radius (expressed in radiometry
-        unit) in the multi-spectral space.
+        :param input_pos_img : Raster instance of a spatial image, which may
+        have been created in the smoothing step
+        :param output_seg_image : path and name of the output segmented image
+        to be written
+        :param spatialr : Int, Spatial radius of the neighborhooh
+        :param ranger: Float, Range radius defining the radius (expressed in
+        radiometry unit) in the multi-spectral space.
         """
         LSMSSegmentation = otbApplication.Registry.CreateApplication(
             "LSMSSegmentation")
@@ -378,29 +356,29 @@ class Raster():
 
     def lsms_merging(self, in_smooth, output_merged, minsize):
         """Third step LSMS :  merge regions whose size in pixels is lower
-        than minsize parameter with the adjacent regions with the adjacent region with closest
-        radiometry and acceptable size, using the LSMSSmallRegionsMerging otb application.
-        It returns a Raster instance of the merged image.
+        than minsize parameter with the adjacent regions with the adjacent
+        region with closest radiometry and acceptable size, using the
+        LSMSSmallRegionsMerging otb application. It returns a Raster instance
+        of the merged image.
 
-        in_smooth : Raster instance of the smoothed image, resulting from the step 1
-        output_merged : path and name of the output merged segmented image to be written
-        minsize : Int, minimum size of a label
+        :param in_smooth : Raster instance of the smoothed image, resulting
+        from the step 1
+        :param output_merged : path and name of the output merged segmented
+        image to be written
+        :param minsize : Int, minimum size of a label
         """
 
-        # The following line creates an instance of the LSMSSmallRegionsMerging application
-        LSMSSmallRegionsMerging = otbApplication.Registry.CreateApplication("LSMSSmallRegionsMerging")
+        # The following line creates an instance of the LSMSSmallRegionsMerging
+        # application
+        LSMSSmallRegionsMerging = otbApplication.Registry.CreateApplication(
+            "LSMSSmallRegionsMerging")
 
         # The following lines set all the application parameters:
         LSMSSmallRegionsMerging.SetParameterString("in", in_smooth.filename)
-
         LSMSSmallRegionsMerging.SetParameterString("inseg", self.filename)
-
         LSMSSmallRegionsMerging.SetParameterString("out", output_merged)
-
         LSMSSmallRegionsMerging.SetParameterInt("minsize", minsize)
-
         LSMSSmallRegionsMerging.SetParameterInt("tilesizex", 256)
-
         LSMSSmallRegionsMerging.SetParameterInt("tilesizey", 256)
 
         # The following line execute the application
@@ -409,45 +387,71 @@ class Raster():
         return Raster(output_merged)
 
     def lsms_vectorisation(self, in_image, output_vector):
-        """Final step of LSMS : convert a label image to a GIS vector file containing
-        one polygon per segment, using the LSMSVectorization otb application
+        """Final step of LSMS : convert a label image to a GIS vector file
+        containing one polygon per segment, using the LSMSVectorization otb
+        application.
 
-        in_image : Raster instance of the image
-        output_vector : path and name of the output vector file ( ex: "vector.shp")
-            to be written
+        :param in_image : Raster instance of the image
+        :param output_vector : path and name of the output vector file ( ex:
+        "vector.shp") to be written
         """
-        # The following line creates an instance of the LSMSVectorization application
-        LSMSVectorization = otbApplication.Registry.CreateApplication("LSMSVectorization")
+        # The following line creates an instance of the LSMSVectorization
+        #application
+        LSMSVectorization = otbApplication.Registry.CreateApplication(
+            "LSMSVectorization")
 
         # The following lines set all the application parameters:
         LSMSVectorization.SetParameterString("in", in_image.filename)
-
         LSMSVectorization.SetParameterString("inseg", self.filename)
-
         LSMSVectorization.SetParameterString("out", output_vector)
-
         LSMSVectorization.SetParameterInt("tilesizex", 256)
-
         LSMSVectorization.SetParameterInt("tilesizey", 256)
 
         # The following line execute the application
         LSMSVectorization.ExecuteAndWriteOutput()
 
-    def lsms(self, spatialr, ranger, maxiter, thres, rangeramp, output_filtered_image, output_spatial_image, output_seg_image, output_merged, minsize, output_vector, m_step = True):
-        """
+    def lsms(self, spatialr, ranger, maxiter, thres, rangeramp,
+             output_filtered_image, output_spatial_image, output_seg_image,
+             output_merged, minsize, output_vector, m_step = True):
+        """Perform a segmentation on Raster instance given. It proceeds in 4
+        steps in row : smoothing, segmentation, merging of small region and
+        vectorisation.
 
+        :param output_filtered_image : path and name of the output image
+        filtered to be written
+        :param output_spatial_image : path and name of the output spatial image
+        to be written
+        :param spatialr : Int, Spatial radius of the neighborhooh
+        :param ranger: Float, Range radius defining the radius (expressed in
+        radiometry unit) in the multi-spectral space.
+        :param maxiter : Int, Maximum number of iterations of the algorithm
+        used in MeanSiftSmoothing application
+        :param thres : Float, Mode convergence threshold #TOCOMPLETE
+        :param rangeramp : Float, Range radius coefficient: This coefficient
+        makes dependent the ranger of the colorimetry of the filtered pixel :
+        y = rangeramp*x+ranger.
+        :param output_seg_image : path and name of the output segmented image
+        to be written
+        :param output_merged : path and name of the output merged segmented
+        image to be written
+        :param minsize : Int, minimum size of a label
+        :param output_vector : path and name of the output vector file ( ex:
+        "vector.shp") to be written
+        :param m_step : Boolean, indicates if the merging step has to be done
         """
 
         img_smoothed, img_pos = self.lsms_smoothing(output_filtered_image, spatialr, ranger, maxiter, thres, rangeramp, output_spatial_image)
 
         print "smoothing step has been realized succesfully"
 
-        img_seg = img_smoothed.lsms_seg(img_pos, output_seg_image, spatialr, ranger)
+        img_seg = img_smoothed.lsms_seg(img_pos, output_seg_image, spatialr,
+                                        ranger)
 
         print "segmentation step has been realized succesfully"
 
         if m_step :
-            img_merged = img_seg.lsms_merging(img_smoothed, output_merged, minsize)
+            img_merged = img_seg.lsms_merging(img_smoothed, output_merged,
+                                              minsize)
 
             print "merging step has been realized succesfully"
 
