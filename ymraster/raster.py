@@ -163,7 +163,7 @@ class Raster():
     def remove_band(self, idx, out_filename):
         """Write a new image with the band at the given index removed
 
-        :param idx: index of the band to remove (starts at 0)
+        :param idx: index of the band to remove (starts at 1)
         :param out_filename: path to the output file
         """
         # Split the N-bands image into N mono-band images (in temp folder)
@@ -178,7 +178,7 @@ class Raster():
         # Concatenate the mono-band images without the unwanted band
         list_path = [os.path.join(gettempdir(), 'splitted_{}.tif'.format(i))
                      for i in range(self.meta['count'])
-                     if i != idx]
+                     if i + 1 != idx]
         ConcatenateImages = otbApplication.Registry.CreateApplication(
             "ConcatenateImages")
         ConcatenateImages.SetParameterStringList("il", list_path)
