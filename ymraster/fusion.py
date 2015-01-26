@@ -19,8 +19,10 @@ if __name__ == "__main__":
     "Example : python fusion.py ../../Donnees/Donnes_supp/" +
     "Spot6_Pan_31072013.tif ../../Donnees/Donnes_supp/Spot6_MS_31072013.tif" +
     " -pref A -dir data_example_seg")
-    parser.add_argument("pan_file", help="Path of the panchromatic image")
-    parser.add_argument("xs_file", help="Path of the multi-spectral image")
+    parser.add_argument("--pan_file", help="Path of the panchromatic image",
+                        required = True)
+    parser.add_argument("--xs_file", help="Path of the multi-spectral image",
+                        required = True)
     parser.add_argument("-pref", "--prefixe", help ="Prefixe to add to the " +
     "file to be written", default = "", type = str)
     parser.add_argument("-dir","--dir_file", default = "", help = "" + 

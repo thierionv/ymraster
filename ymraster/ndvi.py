@@ -17,12 +17,12 @@ if __name__ == "__main__":
     "given image, given the index of the red and nir band. Indexation starts" + 
     " at 1.\n Example : python ndvi.py ../../Donnees/Donnes_supp/" +
     "Spot6_MS_31072013.tif 3 4 -pref A -dir data_example_seg") 
-    parser.add_argument("xs_file", help="Path of the multi-spectral image")
-    parser.add_argument("idx_red", help="Chanel number of the red band",
-                        type = int)
-    parser.add_argument("idx_nir", help="Chanel number of the nir band",
-                        type = int)
-    
+    parser.add_argument("--xs_file", help="Path of the multi-spectral image",
+                        required = True)
+    parser.add_argument("--idx_red", help="Chanel number of the red band",
+                        type = int, required = True)
+    parser.add_argument("--idx_nir", help="Chanel number of the nir band",
+                        type = int, required = True)    
     parser.add_argument("-pref", "--prefixe", help ="Prefixe to add to the " +
     "file to be written", default = "", type = str)
     parser.add_argument("-dir","--dir_file", default = "", help = "Path of "+

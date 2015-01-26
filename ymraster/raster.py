@@ -334,7 +334,7 @@ class Raster():
         radiometry unit) in the multi-spectral space.
         :param maxiter : Int, Maximum number of iterations of the algorithm
         used in MeanSiftSmoothing application
-        :param thres : Float, Mode convergence threshold #TOCOMPLETE
+        :param thres : Float, Mean shift vector threshold
         :param rangeramp : Float, Range radius coefficient: This coefficient
         makes dependent the ranger of the colorimetry of the filtered pixel :
         y = rangeramp*x+ranger.

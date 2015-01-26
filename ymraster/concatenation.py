@@ -18,8 +18,8 @@ if __name__ == "__main__":
     " rasters must have same size.\n\nMoreover, if data types are different, "+
     "then everything will be converted to the default data type in OTB " +
     "(_float_ currently).") 
-    parser.add_argument("im_files",nargs = '+',  help="list of the images " +
-    "paths.")
+    parser.add_argument("--im_files",nargs = '+',  help="list of the images " +
+    "paths.", required = True)
     
     parser.add_argument("-pref", "--prefixe", help ="Prefixe to add to the " +
     "file to be written", default = "", type = str)
