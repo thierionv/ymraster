@@ -86,7 +86,8 @@ if __name__ == "__main__":
         merged_img = seg_img.lsms_merging(smooth_img, output_merged, 
                                           args.minsize)
         print "merging step has been realized succesfully"
-    
+    else:
+        merged_img = seg_img
     #fourth step (optional) : vectorization
     if args.vstep: 
         output_vector = args.dir_file + args.prefixe + 'lsms_vect.shp'
