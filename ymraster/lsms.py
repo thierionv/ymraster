@@ -35,6 +35,10 @@ if __name__ == "__main__":
                         ": This coefficient makes dependent the ranger of the"+
                         " colorimetry of the filtered pixel : y = rangeramp" +
                         " * x + ranger.",required = True, type = float)
+    parser.add_argument("--tilesizex", "-tx",help="Size of tiles along the "+
+                        "X-axis, by default 256", type = int, default = 256)
+    parser.add_argument("--tilesizey", "-ty",help="Size of tiles along the "+
+                        "Y-axis, by default 256", type = int, default = 256)
     parser.add_argument("--mstep", "-m",help="Do the merge step if notified",
                         action = "store_true")
     parser.add_argument("--minsize", "-ms",help="minimum size of a label",
@@ -78,19 +82,23 @@ if __name__ == "__main__":
     #second step : segmentation
     output_seg = args.dir_file + args.prefixe + 'lsms_seg.tif'
     seg_img = smooth_img.lsms_seg (pos_img, output_seg, args.spatialr, 
-                                   args.ranger)
+                                   args.ranger, tilesizex = args.tilesizex,
+                                   tilesizey = args.tilesizey)
     print "segmentation step has been realized succesfully"
     
     #third step (optional) : merging small regions
     if args.mstep: 
         output_merged = args.dir_file + args.prefixe + 'lsms_merged.tif'
         merged_img = seg_img.lsms_merging(smooth_img, output_merged, 
-                                          args.minsize)
+                                          args.minsize, tilesizex = \
+                                          args.tilesizex,tilesizey = \
+                                          args.tilesizey)
         print "merging step has been realized succesfully"
     else:
         merged_img = seg_img
     #fourth step (optional) : vectorization
     if args.vstep: 
         output_vector = args.dir_file + args.prefixe + 'lsms_vect.shp'
-        merged_img.lsms_vectorisation(xs, output_vector)
+        merged_img.lsms_vectorisation(xs, output_vector, tilesizex = \
+                                    args.tilesizex,tilesizey = args.tilesizey)
         print "vectorisation step has been realized succesfully"
