@@ -433,7 +433,8 @@ class Raster():
 
         return Raster(output_filtered_image), Raster(output_spatial_image)
 
-    def lsms_seg (self,input_pos_img, output_seg_image, spatialr, ranger):
+    def lsms_seg (self,input_pos_img, output_seg_image, spatialr, ranger,
+                  tilesizex = 256, tilesizey = 256):
         """Second step of LSMS : produce a labeled image with different clusters,
         according to the range and spatial proximity of the pixels, using the
         LSMSSegmentation otb application. It returns a raster instance of the
@@ -446,6 +447,8 @@ class Raster():
         :param spatialr : Int, Spatial radius of the neighborhooh
         :param ranger: Float, Range radius defining the radius (expressed in
         radiometry unit) in the multi-spectral space.
+        :param tilesizex : Int, Size of tiles along the X-axis, by default 256
+        :param tilesizey : Int, Size of tiles along the Y-axis, by default 256
         """
         LSMSSegmentation = otbApplication.Registry.CreateApplication(
             "LSMSSegmentation")
@@ -455,13 +458,14 @@ class Raster():
         LSMSSegmentation.SetParameterFloat("ranger", ranger)
         LSMSSegmentation.SetParameterFloat("spatialr", spatialr)
         LSMSSegmentation.SetParameterInt("minsize", 0)
-        LSMSSegmentation.SetParameterInt("tilesizex", 256)
-        LSMSSegmentation.SetParameterInt("tilesizey", 256)
+        LSMSSegmentation.SetParameterInt("tilesizex", tilesizex)
+        LSMSSegmentation.SetParameterInt("tilesizey", tilesizey)
         LSMSSegmentation.ExecuteAndWriteOutput()
 
         return Raster(output_seg_image)
 
-    def lsms_merging(self, in_smooth, output_merged, minsize):
+    def lsms_merging(self, in_smooth, output_merged, minsize, tilesizex = 256,
+                     tilesizey = 256):
         """Third step LSMS :  merge regions whose size in pixels is lower
         than minsize parameter with the adjacent regions with the adjacent
         region with closest radiometry and acceptable size, using the
@@ -473,6 +477,8 @@ class Raster():
         :param output_merged : path and name of the output merged segmented
         image to be written
         :param minsize : Int, minimum size of a label
+        :param tilesizex : Int, Size of tiles along the X-axis, by default 256
+        :param tilesizey : Int, Size of tiles along the Y-axis, by default 256
         """
 
         # The following line creates an instance of the LSMSSmallRegionsMerging
@@ -485,15 +491,17 @@ class Raster():
         LSMSSmallRegionsMerging.SetParameterString("inseg", self.filename)
         LSMSSmallRegionsMerging.SetParameterString("out", output_merged)
         LSMSSmallRegionsMerging.SetParameterInt("minsize", minsize)
-        LSMSSmallRegionsMerging.SetParameterInt("tilesizex", 256)
-        LSMSSmallRegionsMerging.SetParameterInt("tilesizey", 256)
+        LSMSSmallRegionsMerging.SetParameterInt("tilesizex", tilesizex)
+        LSMSSmallRegionsMerging.SetParameterInt("tilesizey", tilesizey)
+        
 
         # The following line execute the application
         LSMSSmallRegionsMerging.ExecuteAndWriteOutput()
 
         return Raster(output_merged)
 
-    def lsms_vectorisation(self, in_image, output_vector):
+    def lsms_vectorisation(self, in_image, output_vector, tilesizex = 256,
+                           tilesizey = 256):
         """Final step of LSMS : convert a label image to a GIS vector file
         containing one polygon per segment, using the LSMSVectorization otb
         application.
@@ -501,6 +509,8 @@ class Raster():
         :param in_image : Raster instance of the image
         :param output_vector : path and name of the output vector file ( ex:
         "vector.shp") to be written
+        :param tilesizex : Int, Size of tiles along the X-axis, by default 256
+        :param tilesizey : Int, Size of tiles along the Y-axis, by default 256
         """
         # The following line creates an instance of the LSMSVectorization
         #application
@@ -511,8 +521,8 @@ class Raster():
         LSMSVectorization.SetParameterString("in", in_image.filename)
         LSMSVectorization.SetParameterString("inseg", self.filename)
         LSMSVectorization.SetParameterString("out", output_vector)
-        LSMSVectorization.SetParameterInt("tilesizex", 256)
-        LSMSVectorization.SetParameterInt("tilesizey", 256)
+        LSMSVectorization.SetParameterInt("tilesizex", tilesizex)
+        LSMSVectorization.SetParameterInt("tilesizey", tilesizey)
 
         # The following line execute the application
         LSMSVectorization.ExecuteAndWriteOutput()

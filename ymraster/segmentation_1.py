@@ -12,17 +12,25 @@ if __name__ == "__main__":
     from ymraster import *
      
     #Set of the parse arguments
-    parser = argparse.ArgumentParser(description= "Perform a Large-Scale Mean"+
-                                    "-Shift segmentation in four step:  a " +
-                                    "mean shift fitlering, a segmentation, " +
-                                    " a merge of small regions (optional)" +
-                                    ", a vectorisation (optional). This " +
-                                    "application works using LSMS otb " +
-                                    "application.") 
+    desc = "Perform a chain of treatments from a given multi-spectral image" +\
+            ". The treatments are : a fusion between the two images,a calcul"+\
+            "ation of the ndvi band, an optional extraction of a chosen band"+\
+            " a concatenation between the ndvi and the ms image, and a LSMS "+\
+            " from this last image."
+    parser = argparse.ArgumentParser(description= desc) 
     parser.add_argument("--xs_file", "-xs", help="Path of the multi-spectral" +
                         "image.",required = True)
-    parser.add_argument("--pan_file", help="Path of the panchromatic image",
-                        required = True)
+    parser.add_argument("--pan_file","-pan", help="Path of the panchromatic " +
+                        "image",required = True)
+    parser.add_argument("--idx_red", "-red", help="Chanel number of the red " +
+                        "band", type = int, required = True)
+    parser.add_argument("--idx_nir", "-nir", help="Chanel number of the nir " +
+                        "band", type = int, required = True)
+    parser.add_argument("--estep", "-e",help="Do an extraction if notified",
+                        action = "store_true")
+    parser.add_argument("--idx", "-idx", help="Chanel number of the band to " +
+                        "be removed. Indexation starts at 1.",required = True, 
+                        type = int)
     parser.add_argument("--spatialr", "-spr", help="Spatial radius of the " +
                         "neighborhooh",required = True, type = int)
     parser.add_argument("--ranger", "-rg", help="Range radius defining the " +
@@ -50,9 +58,12 @@ if __name__ == "__main__":
                         "the folder where the outputs will be written" )
     args = parser.parse_args()
     
+    #control the coherency of the arguments
     if not(args.mstep) and args.minsize:
         print "Warning : --msize shouldn't be specified without --mstep"
-        
+    if not(args.estep) and args.idx:
+        print "Warning : --idx shouldn't be specified without --estep"
+    
     
     #Symbol to add in function of the optional parse arguments, to have a 
     #proper path
@@ -62,36 +73,92 @@ if __name__ == "__main__":
         args.prefixe += '_'
     print args
     
+    #--------------------------    
+    # -------fusion -----------
+    #--------------------------
+    
+    #set of the instances and the parameters   
+    spot_xs = Raster(args.xs_file)
+    spot_pan = Raster(args.pan_file)
+    output_fusion = args.dir_file + args.prefixe + 'fusion.tif'
+    
+    #Execution of the method
+    fus_img = spot_xs.fusion(spot_pan,output_fusion)
+    print "Fusion step has been realized succesfully\n"    
+    
+    #--------------------------
+    #------------ndvi----------
+    #--------------------------
+    
+    #set of the parameters    
+    output_ndvi = args.dir_file + args.prefixe + 'ndvi.tif'
+    
+    #Execution of the method
+    ndvi_img = fus_img.ndvi(output_ndvi, args.idx_red, args.idx_nir)
+    print "Writting the ndvi imgage has been realized succesfully\n"    
+
+    #---------------------------    
+    #---extraction (optional)---
+    #---------------------------
+    
+    if args.estep:
+        #set of the parameter
+        output_rmv = args.dir_file + args.prefixe + 'extracted.tif'        
+        
+        #Execution of the method
+        rmv_img = fus_img.remove_band(args.idx, output_rmv)
+        print "Extraction step has been realized succesfully\n"    
+    else:
+        rmv_img = fus_img
+    
+    #--------------------------------------------
+    #--Concatenate the rmv_img and the ndvi_img--
+    #--------------------------------------------
+    
+    #set of the parameters
+    list_im = [ndvi_img]
+    output_concat = args.dir_file + args.prefixe + 'concatenated.tif'
+    
+    #execution of the method
+    concat_img = rmv_img.concatenate( list_im, output_concat)
+    print "Concatenation step has been realized succesfully\n"
+    
+    #--------------------------
+    #-----------LSMS-----------    
+    #--------------------------
+    
     #first step : smoothing
-    xs = Raster(args.xs_file)
-    output_filtered_image = args.dir_file + args.prefixe + "_spr_" + \
+    output_filtered_image = args.dir_file + args.prefixe + "spr_" + \
                             str(args.spatialr) + "_rg_" + str(args.ranger) + \
                             "_max_" + str(args.maxiter) + "_rga_" + \
                             str(args.rangeramp) + "_th_" + str(args.thres)\
-                            + "filtered.tif"
+                            + "_filtered.tif"
     output_spatial_image = args.dir_file + args.prefixe + 'spatial.tif'
-    smooth_img,pos_img = xs.lsms_smoothing(output_filtered_image, 
+    smooth_img,pos_img = concat_img.lsms_smoothing(output_filtered_image, 
                                                    args.spatialr, args.ranger,
                                                    args.maxiter, args.thres, 
                                                    args.rangeramp, 
                                                    output_spatial_image )    
-    print "smoothing step has been realized succesfully"
+    print "smoothing step has been realized succesfully\n"
     
     #second step : segmentation
     output_seg = args.dir_file + args.prefixe + 'lsms_seg.tif'
     seg_img = smooth_img.lsms_seg (pos_img, output_seg, args.spatialr, 
                                    args.ranger)
-    print "segmentation step has been realized succesfully"
+    print "segmentation step has been realized succesfully\n"
     
     #third step (optional) : merging small regions
     if args.mstep: 
         output_merged = args.dir_file + args.prefixe + 'lsms_merged.tif'
         merged_img = seg_img.lsms_merging(smooth_img, output_merged, 
                                           args.minsize)
-        print "merging step has been realized succesfully"
+        print "merging step has been realized succesfully\n"
+    else:
+        merged_img = seg_img
     
     #fourth step (optional) : vectorization
     if args.vstep: 
         output_vector = args.dir_file + args.prefixe + 'lsms_vect.shp'
-        merged_img.lsms_vectorisation(xs, output_vector)
-        print "vectorisation step has been realized succesfully"
+        merged_img.lsms_vectorisation(fus_img, output_vector)
+        print "vectorisation step has been realized succesfully\n"
+        
