@@ -27,6 +27,7 @@ The ``Raster`` class define an Image readed from a file.
 """
 
 from osgeo import osr, gdal
+gdal.UseExceptions()
 import numpy as np
 import rasterio
 
@@ -73,14 +74,14 @@ def concatenate_images(rasters, out_filename):
     """
     # Check for size and type (and that rasters list is not empty)
     raster0 = rasters[0]
-    width, height, otb_dtype = tuple(raster0.meta[key] for key in
-                                     ['width', 'height', 'otb_dtype'])
+    width, height = (raster0.meta['width'], raster0.meta['height'])
+    otb_dtype = raster0.meta['dtype'].otb_dtype
     same_type = True
     for raster in rasters:
         assert raster.meta['width'] == width \
             and raster.meta['height'] == height, \
             "Images have not same size : '{}' and '{}'".format(raster0, raster)
-        if raster.meta['otb_dtype'] != otb_dtype:
+        if raster.meta['dtype'].otb_dtype != otb_dtype:
             same_type = False
 
     # Perform the concatenation
@@ -116,8 +117,8 @@ class DataType(object):
         return revert_match[instance.otb_dtype]
 
 
-class StrDataType(DataType):
-    """Represent a data type given in string format (eg. 'int16', 'int32',
+class LStrDataType(DataType):
+    """Represent a data type given in lower string format (eg. 'int16', 'int32',
     'float32', etc.)"""
 
     data_type_match = {'uint8': otbApplication.ImagePixelType_uint8,
@@ -129,9 +130,48 @@ class StrDataType(DataType):
                        'float64': otbApplication.ImagePixelType_double}
 
 
+class UStrDataType(DataType):
+    """Represent a data type given in upper string format (eg. 'Int16', 'Int32',
+    'Float32', etc.)"""
+
+    data_type_match = {'UInt8': otbApplication.ImagePixelType_uint8,
+                       'UInt16': otbApplication.ImagePixelType_uint16,
+                       'UInt32': otbApplication.ImagePixelType_uint32,
+                       'Int16': otbApplication.ImagePixelType_int16,
+                       'Int32': otbApplication.ImagePixelType_int32,
+                       'Float32': otbApplication.ImagePixelType_float,
+                       'Float64': otbApplication.ImagePixelType_double}
+
+
+class NumpyDataType(DataType):
+    """Represent a data type for Numpy (eg. np.int16, np.int32, np.float32,
+    etc.)"""
+
+    data_type_match = {np.uint8: otbApplication.ImagePixelType_uint8,
+                       np.uint16: otbApplication.ImagePixelType_uint16,
+                       np.uint32: otbApplication.ImagePixelType_uint32,
+                       np.int16: otbApplication.ImagePixelType_int16,
+                       np.int32: otbApplication.ImagePixelType_int32,
+                       np.float32: otbApplication.ImagePixelType_float,
+                       np.float64: otbApplication.ImagePixelType_double}
+
+
+class GdalDataType(DataType):
+    """Represent a data type for gdal (eg. gdal.GDT_Int16, gdal.GDT_Iint32,
+    gdal.GDT_Float32, etc.)"""
+
+    data_type_match = {gdal.GDT_Byte: otbApplication.ImagePixelType_uint8,
+                       gdal.GDT_UInt16: otbApplication.ImagePixelType_uint16,
+                       gdal.GDT_UInt32: otbApplication.ImagePixelType_uint32,
+                       gdal.GDT_Int16: otbApplication.ImagePixelType_int16,
+                       gdal.GDT_Int32: otbApplication.ImagePixelType_int32,
+                       gdal.GDT_Float32: otbApplication.ImagePixelType_float,
+                       gdal.GDT_Float64: otbApplication.ImagePixelType_double}
+
+
 class OtbDataType(DataType):
     """Represent a data type for orfeo-toolbox
-    (eg. otbApplication.ImagePixelType_uint16)"""
+    (eg. otbApplication.ImagePixelType_int16)"""
 
     def __set__(self, instance, value):
         instance._otb_type = value
@@ -143,12 +183,26 @@ class OtbDataType(DataType):
 class RasterDataType(object):
     """The usable class to manage raster data types"""
 
-    str_dtype = StrDataType()
+    lstr_dtype = LStrDataType()
+    ustr_dtype = UStrDataType()
+    numpy_dtype = NumpyDataType()
+    gdal_dtype = GdalDataType()
     otb_dtype = OtbDataType()
 
-    def __init__(self, str_dtype=None, otb_dtype=None):
-        if str_dtype:
-            self.str_dtype = str_dtype
+    def __init__(self,
+                 lstr_dtype=None,
+                 ustr_dtype=None,
+                 numpy_dtype=None,
+                 otb_dtype=None,
+                 gdal_dtype=None):
+        if lstr_dtype:
+            self.lstr_dtype = lstr_dtype
+        elif ustr_dtype:
+            self.ustr_dtype = ustr_dtype
+        elif numpy_dtype:
+            self.numpy_dtype = numpy_dtype
+        elif gdal_dtype:
+            self.gdal_dtype = gdal_dtype
         elif otb_dtype:
             self.otb_dtype = otb_dtype
 
@@ -173,21 +227,24 @@ class Raster():
         self.filename = filename
 
         # Read information from image
-        with rasterio.drivers():
-            with rasterio.open(self.filename) as raster:
-                self.meta = raster.meta
+        ds = gdal.Open(self.filename, gdal.GA_ReadOnly)
+        self.meta = {}
+        self.meta['driver'] = ds.GetDriver()            # gdal.Driver object
+        self.meta['count'] = ds.RasterCount             # int
+        self.meta['width'] = ds.RasterXSize             # int
+        self.meta['height'] = ds.RasterYSize            # int
+        self.meta['dtype'] = RasterDataType(
+            gdal_dtype=ds.GetRasterBand(1).DataType)    # RasterDataType object
+        self.meta['transform'] = ds.GetGeoTransform()   # tuple
 
-                # Read spatial reference as a osr.SpatialReference object
-                srs = osr.SpatialReference()
-                read_srs_ok = \
-                    srs.ImportFromWkt(raster.crs_wkt.encode('utf-8')) \
-                    if raster.crs_wkt is not None \
-                    else None
-                self.meta['srs'] = srs if read_srs_ok == 0 else None
+        # Read spatial reference as a osr.SpatialReference object or None
+        # if there is no srs in metadata
+        self.meta['srs'] = osr.SpatialReference(ds.GetProjection()) \
+            if ds.GetProjection() \
+            else None
 
-                # Read data type as a RasterDataType object
-                dtype = RasterDataType(str_dtype=self.meta['dtype'])
-                self.meta['otb_dtype'] = dtype.otb_dtype
+        # Close file
+        ds = None
 
     def array(self):
         """Return a Numpy array corresponding to the image"""
@@ -195,7 +252,7 @@ class Raster():
         array = np.empty((self.meta['height'],
                           self.meta['width'],
                           self.meta['count']),
-                         dtype=self.meta['dtype'])
+                         dtype=self.meta['dtype'].numpy_dtype)
 
         # Fill the array
         with rasterio.drivers(CPL_DEBUG=True):  # Register GDAL format drivers
@@ -226,8 +283,9 @@ class Raster():
         SplitImage.SetParameterString("in", self.filename)
         SplitImage.SetParameterString("out", os.path.join(gettempdir(),
                                                           'splitted.tif'))
-        SplitImage.SetParameterOutputImagePixelType("out",
-                                                    self.meta['otb_dtype'])
+        SplitImage.SetParameterOutputImagePixelType(
+            "out",
+            self.meta['dtype'].otb_dtype)
         SplitImage.ExecuteAndWriteOutput()
 
         # Concatenate the mono-band images without the unwanted band
@@ -238,9 +296,9 @@ class Raster():
             "ConcatenateImages")
         ConcatenateImages.SetParameterStringList("il", list_path)
         ConcatenateImages.SetParameterString("out", out_filename)
-        ConcatenateImages.SetParameterOutputImagePixelType("out",
-                                                           self.meta[
-                                                               'otb_dtype'])
+        ConcatenateImages.SetParameterOutputImagePixelType(
+            "out",
+            self.meta['dtype'].otb_dtype)
         ConcatenateImages.ExecuteAndWriteOutput()
 
         # Delete mono-band images in temp folder
