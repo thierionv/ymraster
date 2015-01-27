@@ -399,7 +399,7 @@ class Raster():
         return Raster(output_image)
 
     def lsms_smoothing(self, output_filtered_image, spatialr, ranger, maxiter,
-                       thres, rangeramp, output_spatial_image ):
+                       thres, rangeramp, output_spatial_image):
         """First step of LSMS : perform a mean shift fitlering, using
         the MeanShiftSmoothing otb application. It returns two raster instances
         corresponding to the filtered image and the spatial image
@@ -433,8 +433,8 @@ class Raster():
 
         return Raster(output_filtered_image), Raster(output_spatial_image)
 
-    def lsms_seg (self,input_pos_img, output_seg_image, spatialr, ranger,
-                  tilesizex = 256, tilesizey = 256):
+    def lsms_seg(self, input_pos_img, output_seg_image, spatialr, ranger,
+                 tilesizex=256, tilesizey=256):
         """Second step of LSMS : produce a labeled image with different clusters,
         according to the range and spatial proximity of the pixels, using the
         LSMSSegmentation otb application. It returns a raster instance of the
@@ -464,8 +464,8 @@ class Raster():
 
         return Raster(output_seg_image)
 
-    def lsms_merging(self, in_smooth, output_merged, minsize, tilesizex = 256,
-                     tilesizey = 256):
+    def lsms_merging(self, in_smooth, output_merged, minsize, tilesizex=256,
+                     tilesizey=256):
         """Third step LSMS :  merge regions whose size in pixels is lower
         than minsize parameter with the adjacent regions with the adjacent
         region with closest radiometry and acceptable size, using the
@@ -493,15 +493,14 @@ class Raster():
         LSMSSmallRegionsMerging.SetParameterInt("minsize", minsize)
         LSMSSmallRegionsMerging.SetParameterInt("tilesizex", tilesizex)
         LSMSSmallRegionsMerging.SetParameterInt("tilesizey", tilesizey)
-        
 
         # The following line execute the application
         LSMSSmallRegionsMerging.ExecuteAndWriteOutput()
 
         return Raster(output_merged)
 
-    def lsms_vectorisation(self, in_image, output_vector, tilesizex = 256,
-                           tilesizey = 256):
+    def lsms_vectorisation(self, in_image, output_vector, tilesizex=256,
+                           tilesizey=256):
         """Final step of LSMS : convert a label image to a GIS vector file
         containing one polygon per segment, using the LSMSVectorization otb
         application.
@@ -513,7 +512,7 @@ class Raster():
         :param tilesizey : Int, Size of tiles along the Y-axis, by default 256
         """
         # The following line creates an instance of the LSMSVectorization
-        #application
+        # application
         LSMSVectorization = otbApplication.Registry.CreateApplication(
             "LSMSVectorization")
 
@@ -529,7 +528,7 @@ class Raster():
 
     def lsms(self, spatialr, ranger, maxiter, thres, rangeramp,
              output_filtered_image, output_spatial_image, output_seg_image,
-             output_merged, minsize, output_vector, m_step = True):
+             output_merged, minsize, output_vector, m_step=True):
         """Perform a segmentation on Raster instance given. It proceeds in 4
         steps in row : smoothing, segmentation, merging of small region and
         vectorisation.
@@ -557,7 +556,13 @@ class Raster():
         :param m_step : Boolean, indicates if the merging step has to be done
         """
 
-        img_smoothed, img_pos = self.lsms_smoothing(output_filtered_image, spatialr, ranger, maxiter, thres, rangeramp, output_spatial_image)
+        img_smoothed, img_pos = self.lsms_smoothing(output_filtered_image,
+                                                    spatialr,
+                                                    ranger,
+                                                    maxiter,
+                                                    thres,
+                                                    rangeramp,
+                                                    output_spatial_image)
 
         print "smoothing step has been realized succesfully"
 
@@ -566,7 +571,7 @@ class Raster():
 
         print "segmentation step has been realized succesfully"
 
-        if m_step :
+        if m_step:
             img_merged = img_seg.lsms_merging(img_smoothed, output_merged,
                                               minsize)
 
