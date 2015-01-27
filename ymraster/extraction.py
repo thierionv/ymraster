@@ -14,18 +14,16 @@ if __name__ == "__main__":
     
     #Set of the parse arguments
     parser = argparse.ArgumentParser(description= "Write a new image with the"+
-    " band at the given index removed" + "\n Example : extraction ndvi.py " +
-    "../../Donnees/Donnes_supp/Spot6_MS_31072013.tif 1 -pref A -dir "+
-    "data_example_seg") 
+                                    " band at the given index removed\n ")
     parser.add_argument("--xs_file", help="Path of the multi-spectral image.",
                         required = True)
     parser.add_argument("--idx", help="Chanel number of the band to be removed"
-    + ". Indexation starts at 1.",required = True, type = int)
-    
+                        + ". Indexation starts at 1.",required = True, 
+                        type = int)    
     parser.add_argument("-pref", "--prefixe", help ="Prefixe to add to the " +
-    "file to be written", default = "", type = str)
+                        "file to be written", default = "", type = str)
     parser.add_argument("-dir","--dir_file", default = "", help = "Path of "+
-    "the folder where the output will be written" )
+                        "the folder where the output will be written" )
     args = parser.parse_args()
     
     #Symbol to add in function of the optional parse arguments, to have a 
