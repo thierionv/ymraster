@@ -47,6 +47,7 @@ if __name__ == "__main__":
                         "the folder where the outputs will be written" )
     args = parser.parse_args()
     
+    #control the coherency of the arguments
     if not(args.mstep) and args.minsize:
         print "Warning : --msize shouldn't be specified without --mstep"
         
