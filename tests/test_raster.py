@@ -12,8 +12,20 @@ import re
 import subprocess
 
 
-def _check_output_image(tester, filename, driver, width, height, number_bands,
-                        dtype, min_=None, max_=None, mean=None, stddev=None):
+def _check_output_image(tester,
+                        filename,
+                        driver,
+                        width,
+                        height,
+                        number_bands,
+                        dtype,
+                        proj=None,
+                        transform=None,
+                        date=None,
+                        min_=None,
+                        max_=None,
+                        mean=None,
+                        stddev=None):
     dtype_str_match = {np.uint16: 'UInt16',
                        np.int16: 'Int16'}
     info = subprocess.check_output(["gdalinfo", "-stats",
@@ -51,7 +63,7 @@ class TestArrayToRaster(unittest.TestCase):
     def setUp(self):
         self.driver = u'GTiff'
 
-    def test_should_write_one_band_square_uint16_image(self):
+    def test_save_array_should_write_one_band_square_uint16_image(self):
         self.width = 200
         self.height = 200
         self.number_bands = 1
@@ -60,11 +72,19 @@ class TestArrayToRaster(unittest.TestCase):
         f = tempfile.NamedTemporaryFile(suffix='.tif')
         self.filename = f.name
         self._execute_save_array()
-        _check_output_image(self, self.filename, self.driver, self.width,
-                            self.height, self.number_bands, self.dtype,
-                            self.value, self.value, self.value, 0)
+        _check_output_image(self,
+                            self.filename,
+                            self.driver,
+                            self.width,
+                            self.height,
+                            self.number_bands,
+                            self.dtype,
+                            min_=self.value,
+                            max_=self.value,
+                            mean=self.value,
+                            stddev=0)
 
-    def test_should_write_three_band_square_uint16_image(self):
+    def test_save_array_should_write_three_band_square_uint16_image(self):
         self.width = 400
         self.height = 400
         self.number_bands = 3
@@ -73,11 +93,19 @@ class TestArrayToRaster(unittest.TestCase):
         f = tempfile.NamedTemporaryFile(suffix='.tif')
         self.filename = f.name
         self._execute_save_array()
-        _check_output_image(self, self.filename, self.driver, self.width,
-                            self.height, self.number_bands, self.dtype,
-                            self.value, self.value, self.value, 0)
+        _check_output_image(self,
+                            self.filename,
+                            self.driver,
+                            self.width,
+                            self.height,
+                            self.number_bands,
+                            self.dtype,
+                            min_=self.value,
+                            max_=self.value,
+                            mean=self.value,
+                            stddev=0)
 
-    def test_should_write_three_band_rectangle_uint16_image(self):
+    def test_save_array_should_write_three_band_rectangle_uint16_image(self):
         self.width = 800
         self.height = 600
         self.number_bands = 3
@@ -86,9 +114,17 @@ class TestArrayToRaster(unittest.TestCase):
         f = tempfile.NamedTemporaryFile(suffix='.tif')
         self.filename = f.name
         self._execute_save_array()
-        _check_output_image(self, self.filename, self.driver, self.width,
-                            self.height, self.number_bands, self.dtype,
-                            self.value, self.value, self.value, 0)
+        _check_output_image(self,
+                            self.filename,
+                            self.driver,
+                            self.width,
+                            self.height,
+                            self.number_bands,
+                            self.dtype,
+                            min_=self.value,
+                            max_=self.value,
+                            mean=self.value,
+                            stddev=0)
 
     def test_should_raise_value_error_if_value_out_of_range(self):
         width = 3
@@ -158,13 +194,22 @@ class TestRealRaster(unittest.TestCase):
         self.filename = 'tests/data/RGB.byte.tif'
         self.raster = Raster(self.filename)
 
-    def test_should_get_attr_values(self):
+    def test_should_get_attr_values_of_raster(self):
         self.assertEqual(self.raster.filename, self.filename)
         self.assertEqual(self.raster.meta['count'], 3)
-        self.assertEqual(self.raster.meta['crs'],
-                         {'init': u'epsg:32618'})
-        self.assertEqual(self.raster.meta['dtype'], 'uint8')
-        self.assertEqual(self.raster.meta['driver'], u'GTiff')
+        self.assertEqual(
+            self.raster.meta['srs'].ExportToWkt(),
+            'PROJCS["UTM Zone 18, Northern Hemisphere",GEOGCS["Unknown datum '
+            'based upon the WGS 84 ellipsoid",DATUM["Not_specified_based_on'
+            '_WGS_84_spheroid",SPHEROID["WGS 84",6378137,298.257223563,'
+            'AUTHORITY["EPSG","7030"]]],PRIMEM["Greenwich",0],UNIT["degree",'
+            '0.0174532925199433]],PROJECTION["Transverse_Mercator"],'
+            'PARAMETER["latitude_of_origin",0],PARAMETER["central_meridian",'
+            '-75],PARAMETER["scale_factor",0.9996],PARAMETER["false_easting",'
+            '500000],PARAMETER["false_northing",0],UNIT["metre",1,'
+            'AUTHORITY["EPSG","9001"]]]')
+        self.assertEqual(self.raster.meta['dtype'].lstr_dtype, 'uint8')
+        self.assertEqual(self.raster.meta['driver'].GetDescription(), u'GTiff')
         self.assertEqual(self.raster.meta['transform'], (101985.0,
                                                          300.0379266750948,
                                                          0.0,
@@ -173,17 +218,16 @@ class TestRealRaster(unittest.TestCase):
                                                          -300.041782729805))
         self.assertEqual(self.raster.meta['height'], 718)
         self.assertEqual(self.raster.meta['width'], 791)
-        self.assertEqual(self.raster.meta['nodata'], 0.0)
 
-    def test_should_get_array(self):
+    def test_should_get_array_of_raster(self):
         array = self.raster.array()
         self.assertEqual(array.ndim, 3)
         self.assertEqual(array.shape, (718, 791, 3))
         self.assertEqual(array.dtype, np.uint8)
 
-    def test_should_raise_io_error_on_missing_file(self):
+    def test_should_raster_raise_runtime_error_on_missing_file(self):
         filename = 'tests/data/not_exists.tif'
-        self.assertRaises(IOError, Raster, filename)
+        self.assertRaises(RuntimeError, Raster, filename)
 
 
 class TestRasterArrayFunctions(unittest.TestCase):
