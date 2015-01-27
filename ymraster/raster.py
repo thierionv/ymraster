@@ -26,7 +26,7 @@ The ``Raster`` class
 The ``Raster`` class define an Image readed from a file.
 """
 
-# from osgeo import gdal
+from osgeo import osr, gdal
 import numpy as np
 import rasterio
 
@@ -176,6 +176,16 @@ class Raster():
         with rasterio.drivers():
             with rasterio.open(self.filename) as raster:
                 self.meta = raster.meta
+
+                # Read spatial reference as a osr.SpatialReference object
+                srs = osr.SpatialReference()
+                read_srs_ok = \
+                    srs.ImportFromWkt(raster.crs_wkt.encode('utf-8')) \
+                    if raster.crs_wkt is not None \
+                    else None
+                self.meta['srs'] = srs if read_srs_ok == 0 else None
+
+                # Read data type as a RasterDataType object
                 dtype = RasterDataType(str_dtype=self.meta['dtype'])
                 self.meta['otb_dtype'] = dtype.otb_dtype
 
@@ -193,6 +203,17 @@ class Raster():
                 for i in range(self.meta['count']):
                     array[:, :, i] = img.read_band(i+1)
         return array
+
+    def set_projection(self, srs):
+        """Write the given projection into to file metadata
+
+        :param srs: osgeo.osr.SpatialReference object that represents the
+        projection to set
+        """
+        ds = gdal.Open(self.filename, gdal.GA_Update)
+        ds.SetProjection(srs.ExportTowkt())
+        ds = None
+        self.meta['srs'] = srs
 
     def remove_band(self, idx, out_filename):
         """Write a new image with the band at the given index removed
