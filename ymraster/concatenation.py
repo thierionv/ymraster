@@ -14,17 +14,18 @@ if __name__ == "__main__":
     
     #Set of the parse arguments
     parser = argparse.ArgumentParser(description= "Write an image which is " +
-    "the concatenation of the given rasters in order.\nAll bands in all input"+
-    " rasters must have same size.\n\nMoreover, if data types are different, "+
-    "then everything will be converted to the default data type in OTB " +
-    "(_float_ currently).") 
+                                    "the concatenation of the given rasters " +
+                                    "in order.All bands in all input rasters" +
+                                    " must have same size.Moreover, if data " +
+                                    "types are different, then everything " +
+                                    "will be converted to the default data " +
+                                    "type in OTB (_float_ currently).") 
     parser.add_argument("--im_files",nargs = '+',  help="list of the images " +
-    "paths.", required = True)
-    
+                        "paths.", required = True)
     parser.add_argument("-pref", "--prefixe", help ="Prefixe to add to the " +
-    "file to be written", default = "", type = str)
+                        "file to be written", default = "", type = str)
     parser.add_argument("-dir","--dir_file", default = "", help = "Path of "+
-    "the folder where the output will be written" )
+                        "the folder where the output will be written" )
     args = parser.parse_args()
     
     #Symbol to add in function of the optional parse arguments, to have a 
