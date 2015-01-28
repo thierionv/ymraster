@@ -173,6 +173,14 @@ class TestArrayToRaster(unittest.TestCase):
         self.assertRaises(NotImplementedError, _save_array, a, out_file.name,
                           meta)
 
+    def tearDown(self):
+        tmpdir = tempfile.gettempdir()
+        tmpfilenames = [filename
+                        for filename in os.listdir(tmpdir)
+                        if filename.endswith('.tif.aux.xml')]
+        for filename in tmpfilenames:
+            os.remove(os.path.join(tmpdir, filename))
+
 
 class TestConcatenateImages(unittest.TestCase):
 
@@ -217,6 +225,14 @@ class TestFusion(unittest.TestCase):
                             self.pan.meta['height'],
                             self.ms.meta['count'],
                             'Float32')
+
+    def tearDown(self):
+        tmpdir = tempfile.gettempdir()
+        tmpfilenames = [filename
+                        for filename in os.listdir(tmpdir)
+                        if filename.endswith('.tif.aux.xml')]
+        for filename in tmpfilenames:
+            os.remove(os.path.join(tmpdir, filename))
 
 
 class TestOtbFunctions(unittest.TestCase):
@@ -339,6 +355,15 @@ class TestOtbFunctions(unittest.TestCase):
         ds = ogr.Open(out_segmented_merged_shp_filename)
         layer = ds.GetLayer(0)
         self.assertEqual(layer.GetFeatureCount(), number_labels)
+
+    def tearDown(self):
+        tmpdir = tempfile.gettempdir()
+        tmpfilenames = [filename
+                        for filename in os.listdir(tmpdir)
+                        if filename.endswith('.tif.aux.xml')
+                        or filename.startswith('segmented_merged.')]
+        for filename in tmpfilenames:
+            os.remove(os.path.join(tmpdir, filename))
 
 
 class TestRealRaster(unittest.TestCase):
