@@ -27,7 +27,7 @@ if __name__ == "__main__":
                         required = True, type = str)
     parser.add_argument("-d","--dir", default = "", help = "Path of the " +
                         "folder where the output will be written. The \"/\"" +
-                        " or \"\\\" have to be add at the end.")
+                        " or \"\\\" have to be added at the end.")
     args = parser.parse_args()
     print args
 

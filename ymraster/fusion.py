@@ -27,16 +27,16 @@ if __name__ == "__main__":
                         required = True, type = str)
     parser.add_argument("-d","--dir", default = "", help = "Path of the " +
                         "folder where the output will be written. The \"/\"" +
-                        " or \"\\\" have to be add at the end.")
+                        " or \"\\\" have to be added at the end.")
     args = parser.parse_args()
     print args
-    #Symbol to add in function of the optional parse arguments, to have a 
-    #proper path
-    output_fusion = args.dir + args.out_file 
+
     
-    #set of the instances    
+    
+    #set of the instances and the output name    
     spot_xs = Raster(args.xs_file)
     spot_pan = Raster(args.pan_file)
+    output_fusion = args.dir + args.out_file 
     
     #Execution of the method
     fus_img = spot_xs.fusion(spot_pan,output_fusion)
