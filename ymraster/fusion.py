@@ -29,7 +29,7 @@ if __name__ == "__main__":
                         "folder where the output will be written. The \"/\"" +
                         " or \"\\\" have to be add at the end.")
     args = parser.parse_args()
-    
+    print args
     #Symbol to add in function of the optional parse arguments, to have a 
     #proper path
     output_fusion = args.dir + args.out_file 
