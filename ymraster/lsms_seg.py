@@ -36,28 +36,23 @@ if __name__ == "__main__":
     parser.add_argument("--tilesizey", "-ty",help="Size of tiles along the "+
                         "Y-axis (default value is 256)", type = int, default =
                         256)
-    parser.add_argument("-pref", "--prefixe", help ="Prefixe to add to the " +
-                        "file to be written", default = "", type = str)
-    parser.add_argument("-dir","--dir_file", default = "", help = "Path of "+
-                        "the folder where the output will be written" )
+    parser.add_argument("-out", "--out_file", help ="Name of the output file",
+                        required = True, type = str)
+    parser.add_argument("-d","--dir", default = "", help = "Path of the " +
+                        "folder where the output will be written. The \"/\"" +
+                        " or \"\\\" have to be add at the end.")
     args = parser.parse_args()
-    
-
-    #Symbol to add in function of the optional parse arguments, to have a 
-    #proper path
-    if args.dir_file:
-        args.dir_file += '/'
-    if args.prefixe:
-        args.prefixe += '_'
     print args
     
-    #segmentation step
-    output_seg = args.dir_file + args.prefixe + 'lsms_seg.tif'
+    #set of the instances and the output name
+    output_seg = args.dir + args.out_file 
     smooth_img = Raster(args.filtered_file)
     pos_img = Raster(args.pos_file)
+    
+    #Execution of the method
     seg_img = smooth_img.lsms_seg (pos_img, output_seg, args.spatialr, 
                                    args.ranger, tilesizex = args.tilesizex,
                                    tilesizey = args.tilesizey)
                                    
-    print "segmentation step has been realized succesfully"
+    print "Segmentation has been realized succesfully"
     
