@@ -31,6 +31,8 @@ gdal.UseExceptions()
 import numpy as np
 import rasterio
 
+from fix_proj_decorator import fix_missing_proj
+
 # TODO: Gérer plus tard les chemins d'accès qui ne sont pas les mêmes pour
 # toutes les machines
 import os
@@ -268,7 +270,7 @@ class Raster():
         projection to set
         """
         ds = gdal.Open(self.filename, gdal.GA_Update)
-        ds.SetProjection(srs.ExportTowkt())
+        ds.SetProjection(srs.ExportToWkt())
         ds = None
         self.meta['srs'] = srs
 
@@ -324,6 +326,7 @@ class Raster():
 
         return Raster(output_image)
 
+    @fix_missing_proj
     def ndvi(self, out_filename, idx_red, idx_nir):
         """Write the NDVI of the image into the given output file and
         return the corresponding Raster object. Indexation starts at 1.
@@ -343,6 +346,7 @@ class Raster():
 
         return Raster(out_filename)
 
+    @fix_missing_proj
     def ndwi(self, out_filename, idx_nir, idx_mir):
         """Write the NDWI of the image into the given output file and
         return the corresponding Raster object. Indexation starts at 1.
@@ -364,6 +368,7 @@ class Raster():
 
     ndmi = ndwi
 
+    @fix_missing_proj
     def mndwi(self, out_filename, idx_green, idx_mir):
         """Write the MNDWI of the image into the given output file and
         return the corresponding Raster object. Indexation starts at 1.
@@ -466,6 +471,7 @@ class Raster():
 
         return Raster(output_seg_image)
 
+    @fix_missing_proj
     def lsms_merging(self, in_smooth, output_merged, minsize, tilesizex=256,
                      tilesizey=256):
         """Third step LSMS :  merge regions whose size in pixels is lower
