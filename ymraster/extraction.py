@@ -15,29 +15,23 @@ if __name__ == "__main__":
     #Set of the parse arguments
     parser = argparse.ArgumentParser(description= "Write a new image with the"+
                                     " band at the given index removed\n ")
-    parser.add_argument("--xs_file", help="Path of the multi-spectral image.",
-                        required = True)
-    parser.add_argument("--idx", help="Chanel number of the band to be removed"
-                        + ". Indexation starts at 1.",required = True, 
-                        type = int)    
-    parser.add_argument("-pref", "--prefixe", help ="Prefixe to add to the " +
-                        "file to be written", default = "", type = str)
-    parser.add_argument("-dir","--dir_file", default = "", help = "Path of "+
-                        "the folder where the output will be written" )
+    parser.add_argument("--xs_file","-xs", help="Path of the multi-spectral " +
+                        "image", required = True)
+    parser.add_argument("--idx", "-idx", help="Chanel number of the band to " +
+                        "be removed. Indexation starts at 1.",required = True, 
+                        type = int)  
+    parser.add_argument("-out", "--out_file", help ="Name of the output file",
+                        required = True, type = str)
+    parser.add_argument("-d","--dir", default = "", help = "Path of the " +
+                        "folder where the output will be written. The \"/\"" +
+                        " or \"\\\" have to be add at the end.")
     args = parser.parse_args()
+    print args
     
-    #Symbol to add in function of the optional parse arguments, to have a 
-    #proper path
-    if args.dir_file:
-        args.dir_file += '/'
-    if args.prefixe:
-        args.prefixe += '_'
-    output_rmv = args.dir_file + args.prefixe + 'extracted.tif'    
-    print args    
-
+    output_rmv = args.dir + args.out_file           
     #set of the instance    
     spot_xs = Raster(args.xs_file)
     
     #Execution of the method
     rmv_img = spot_xs.remove_band(args.idx, output_rmv)
-    
+    print "Extraction has been realized succesfully\n"
