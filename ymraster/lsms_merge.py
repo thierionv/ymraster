@@ -26,6 +26,12 @@ if __name__ == "__main__":
                         + " image.",required = True)
     parser.add_argument("--minsize", "-ms",help="minimum size of a label",
                         type = int, required = True)
+    parser.add_argument("--tilesizex", "-tx",help="Size of tiles along the "+
+                        "X-axis (default value is 256)", type = int, default =
+                        256)
+    parser.add_argument("--tilesizey", "-ty",help="Size of tiles along the "+
+                        "Y-axis (default value is 256)", type = int, default =
+                        256)
     parser.add_argument("-pref", "--prefixe", help ="Prefixe to add to the " +
                         "file to be written", default = "", type = str)
     parser.add_argument("-dir","--dir_file", default = "", help = "Path of "+
@@ -45,6 +51,8 @@ if __name__ == "__main__":
     smooth_img = Raster(args.filtered_file)
     output_merged = args.dir_file + args.prefixe + 'lsms_merged.tif'
     merged_img = seg_img.lsms_merging(smooth_img, output_merged, 
-                                          args.minsize)
+                                          args.minsize, tilesizex = \
+                                          args.tilesizex,tilesizey = \
+                                          args.tilesizey)
     print "merging step has been realized succesfully"
     
