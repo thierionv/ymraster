@@ -37,29 +37,22 @@ if __name__ == "__main__":
                          default = 0)
     parser.add_argument("--modesearch", "-mos", help="Mean shift vector threshold ",
                         type = int, default = 0) 
-    parser.add_argument("-pref", "--prefixe", help ="Prefixe to add to the " +
-                        "file to be written", default = "", type = str)
-    parser.add_argument("-dir","--dir_file", default = "", help = "Path of "+
-                        "the folder where the outputs will be written" )
+    parser.add_argument("-out", "--out_file", help ="Name of the output files"+
+                        ". Two arguments expected, corresponding respectively"+
+                        " to the filetered image and the spatial image" ,
+                        required = True, type = str, nargs = 2)
+    parser.add_argument("-d","--dir", default = "", help = "Path of the " +
+                        "folder where the output will be written. The \"/\"" +
+                        " or \"\\\" have to be add at the end.")
     args = parser.parse_args()
-    
-    
-    #Symbol to add in function of the optional parse arguments, to have a 
-    #proper path
-    if args.dir_file:
-        args.dir_file += '/'
-    if args.prefixe:
-        args.prefixe += '_'
     print args
     
-    #smoothing step
+    #set of the instance and output names
     xs = Raster(args.xs_file)
-    output_filtered_image = args.dir_file + args.prefixe + "_spr_" + \
-                            str(args.spatialr) + "_rg_" + str(args.ranger) + \
-                            "_max_" + str(args.maxiter) + "_rga_" + \
-                            str(args.rangeramp) + "_th_" + str(args.thres)\
-                            + "filtered.tif"
-    output_spatial_image = args.dir_file + args.prefixe + 'spatial.tif'
+    output_filtered_image = args.dir + args.out_file[0]
+    output_spatial_image = args.dir + args.out_file[1]
+    
+    #Execution of the method
     smooth_img,pos_img = xs.lsms_smoothing(output_filtered_image, 
                                            args.spatialr, args.ranger,
                                            output_spatial_image, thres = 
@@ -67,4 +60,4 @@ if __name__ == "__main__":
                                            args.rangeramp, maxiter = 
                                            args.maxiter, modesearch = 
                                            args.modesearch)    
-    print "smoothing step has been realized succesfully"
+    print "smoothing step has been realized succesfully\n"
