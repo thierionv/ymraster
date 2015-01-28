@@ -40,7 +40,7 @@ if __name__ == "__main__":
     
     #Execution of the method
     fus_img = spot_xs.fusion(spot_pan,output_fusion)
-    
+    print "Fusion has been realized succesfully\n" 
     
 
 
