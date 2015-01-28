@@ -19,23 +19,20 @@ if __name__ == "__main__":
     "Example : python fusion.py ../../Donnees/Donnes_supp/" +
     "Spot6_Pan_31072013.tif ../../Donnees/Donnes_supp/Spot6_MS_31072013.tif" +
     " -pref A -dir data_example_seg")
-    parser.add_argument("--pan_file", help="Path of the panchromatic image",
-                        required = True)
-    parser.add_argument("--xs_file", help="Path of the multi-spectral image",
-                        required = True)
-    parser.add_argument("-pref", "--prefixe", help ="Prefixe to add to the " +
-    "file to be written", default = "", type = str)
-    parser.add_argument("-dir","--dir_file", default = "", help = "" + 
-    "Path of the folder where the output will be written" )
+    parser.add_argument("--pan_file", "-pan", help="Path of the panchromatic "+
+                        "image", required = True)
+    parser.add_argument("--xs_file","-xs", help="Path of the multi-spectral " +
+                        "image", required = True)
+    parser.add_argument("-out", "--out_file", help ="Name of the output file",
+                        required = True, type = str)
+    parser.add_argument("-d","--dir", default = "", help = "Path of the " +
+                        "folder where the output will be written. The \"/\"" +
+                        " or \"\\\" have to be add at the end.")
     args = parser.parse_args()
     
     #Symbol to add in function of the optional parse arguments, to have a 
     #proper path
-    if args.dir_file:
-        args.dir_file += '/'
-    if args.prefixe:
-        args.prefixe += '_'
-    output_fusion = args.dir_file + args.prefixe + 'fusion.tif'
+    output_fusion = args.dir + args.out_file 
     
     #set of the instances    
     spot_xs = Raster(args.xs_file)
