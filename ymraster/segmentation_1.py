@@ -38,14 +38,21 @@ if __name__ == "__main__":
                         "-spectral space.",required = True, type = float)
     parser.add_argument("--maxiter", "-max", help="Maximum number of " + 
                         "iterations of the algorithm used in "+
-                        "MeanSiftSmoothing application",required = True, 
-                        type = int)
-    parser.add_argument("--thres", "-th", help="Mean shift vector threshold ",
-                        required = True, type = float)                
+                        "MeanSiftSmoothing application (default value is 10)",
+                        type = int, default = 10)
+    parser.add_argument("--thres", "-th", help="Mean shift vector threshold" +
+                        "(default value is 0.1).", type = float, default = 0.1)                
     parser.add_argument("--rangeramp", "-rga", help="Range radius coefficient"+
                         ": This coefficient makes dependent the ranger of the"+
                         " colorimetry of the filtered pixel : y = rangeramp" +
-                        " * x + ranger.",required = True, type = float)
+                        " * x + ranger(default value is 0).", type = float,
+                         default = 0)
+    parser.add_argument("--modesearch", "-mos", help="Mean shift vector threshold ",
+                        type = int, default = 0)
+    parser.add_argument("--tilesizex", "-tx",help="Size of tiles along the "+
+                        "X-axis, by default 256", type = int, default = 256)
+    parser.add_argument("--tilesizey", "-ty",help="Size of tiles along the "+
+                        "Y-axis, by default 256", type = int, default = 256)
     parser.add_argument("--mstep", "-m",help="Do the merge step if notified",
                         action = "store_true")
     parser.add_argument("--minsize", "-ms",help="minimum size of a label",
@@ -135,30 +142,34 @@ if __name__ == "__main__":
                             + "_filtered.tif"
     output_spatial_image = args.dir_file + args.prefixe + 'spatial.tif'
     smooth_img,pos_img = concat_img.lsms_smoothing(output_filtered_image, 
-                                                   args.spatialr, args.ranger,
-                                                   args.maxiter, args.thres, 
-                                                   args.rangeramp, 
-                                                   output_spatial_image )    
+                                           args.spatialr, args.ranger,
+                                           output_spatial_image, thres = 
+                                           args.thres, rangeramp = 
+                                           args.rangeramp, maxiter = 
+                                           args.maxiter, modesearch = 
+                                           args.modesearch)    
     print "smoothing step has been realized succesfully\n"
     
     #second step : segmentation
     output_seg = args.dir_file + args.prefixe + 'lsms_seg.tif'
     seg_img = smooth_img.lsms_seg (pos_img, output_seg, args.spatialr, 
-                                   args.ranger)
-    print "segmentation step has been realized succesfully\n"
+                                   args.ranger, tilesizex = args.tilesizex,
+                                   tilesizey = args.tilesizey)
+    print "segmentation step has been realized succesfully"
     
     #third step (optional) : merging small regions
     if args.mstep: 
         output_merged = args.dir_file + args.prefixe + 'lsms_merged.tif'
         merged_img = seg_img.lsms_merging(smooth_img, output_merged, 
-                                          args.minsize)
-        print "merging step has been realized succesfully\n"
+                                          args.minsize, tilesizex = \
+                                          args.tilesizex,tilesizey = \
+                                          args.tilesizey)
+        print "merging step has been realized succesfully"
     else:
         merged_img = seg_img
-    
     #fourth step (optional) : vectorization
     if args.vstep: 
         output_vector = args.dir_file + args.prefixe + 'lsms_vect.shp'
-        merged_img.lsms_vectorisation(fus_img, output_vector)
-        print "vectorisation step has been realized succesfully\n"
-        
+        merged_img.lsms_vectorisation(concat_img, output_vector, tilesizex = \
+                                    args.tilesizex,tilesizey = args.tilesizey)
+        print "vectorisation step has been realized succesfully"
