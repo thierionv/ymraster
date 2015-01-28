@@ -398,8 +398,9 @@ class Raster():
 
         return Raster(output_image)
 
-    def lsms_smoothing(self, output_filtered_image, spatialr, ranger, maxiter,
-                       thres, rangeramp, output_spatial_image):
+    def lsms_smoothing(self, output_filtered_image, spatialr, ranger,
+                      output_spatial_image, thres = 0.1, rangeramp = 0,
+                      maxiter = 10, modesearch = 0):
         """First step of LSMS : perform a mean shift fitlering, using
         the MeanShiftSmoothing otb application. It returns two raster instances
         corresponding to the filtered image and the spatial image
@@ -429,6 +430,7 @@ class Raster():
         MeanShiftSmoothing.SetParameterFloat("thres", thres)
         MeanShiftSmoothing.SetParameterFloat("rangeramp", rangeramp)
         MeanShiftSmoothing.SetParameterInt("maxiter", maxiter)
+        MeanShiftSmoothing.SetParameterInt("modesearch", modesearch)
         MeanShiftSmoothing.ExecuteAndWriteOutput()
 
         return Raster(output_filtered_image), Raster(output_spatial_image)
