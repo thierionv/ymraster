@@ -27,18 +27,23 @@ if __name__ == "__main__":
                         "-spectral space.",required = True, type = float)
     parser.add_argument("--maxiter", "-max", help="Maximum number of " + 
                         "iterations of the algorithm used in "+
-                        "MeanSiftSmoothing application",required = True, 
-                        type = int)
-    parser.add_argument("--thres", "-th", help="Mean shift vector threshold ",
-                        required = True, type = float)                
+                        "MeanSiftSmoothing application (default value is 10)",
+                        type = int, default = 10)
+    parser.add_argument("--thres", "-th", help="Mean shift vector threshold" +
+                        "(default value is 0.1).", type = float, default = 0.1)                
     parser.add_argument("--rangeramp", "-rga", help="Range radius coefficient"+
                         ": This coefficient makes dependent the ranger of the"+
                         " colorimetry of the filtered pixel : y = rangeramp" +
-                        " * x + ranger.",required = True, type = float)
+                        " * x + ranger(default value is 0).", type = float,
+                         default = 0)
+    parser.add_argument("--modesearch", "-mos", help="Mean shift vector thres"+
+                        "hold (default value is 0)",type = int,default = 0)
     parser.add_argument("--tilesizex", "-tx",help="Size of tiles along the "+
-                        "X-axis, by default 256", type = int, default = 256)
+                        "X-axis (default value is 256)", type = int, default =
+                        256)
     parser.add_argument("--tilesizey", "-ty",help="Size of tiles along the "+
-                        "Y-axis, by default 256", type = int, default = 256)
+                        "Y-axis (default value is 256)", type = int, default =
+                        256)
     parser.add_argument("--mstep", "-m",help="Do the merge step if notified",
                         action = "store_true")
     parser.add_argument("--minsize", "-ms",help="minimum size of a label",
@@ -73,10 +78,12 @@ if __name__ == "__main__":
                             + "filtered.tif"
     output_spatial_image = args.dir_file + args.prefixe + 'spatial.tif'
     smooth_img,pos_img = xs.lsms_smoothing(output_filtered_image, 
-                                                   args.spatialr, args.ranger,
-                                                   args.maxiter, args.thres, 
-                                                   args.rangeramp, 
-                                                   output_spatial_image )    
+                                           args.spatialr, args.ranger,
+                                           output_spatial_image, thres = 
+                                           args.thres, rangeramp = 
+                                           args.rangeramp, maxiter = 
+                                           args.maxiter, modesearch = 
+                                           args.modesearch)   
     print "smoothing step has been realized succesfully"
     
     #second step : segmentation
