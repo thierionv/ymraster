@@ -30,6 +30,12 @@ if __name__ == "__main__":
                         "-spectral space. It should be the same that specified"
                         + " in the smoothing step",required = True,
                         type = float)
+    parser.add_argument("--tilesizex", "-tx",help="Size of tiles along the "+
+                        "X-axis (default value is 256)", type = int, default =
+                        256)
+    parser.add_argument("--tilesizey", "-ty",help="Size of tiles along the "+
+                        "Y-axis (default value is 256)", type = int, default =
+                        256)
     parser.add_argument("-pref", "--prefixe", help ="Prefixe to add to the " +
                         "file to be written", default = "", type = str)
     parser.add_argument("-dir","--dir_file", default = "", help = "Path of "+
@@ -48,9 +54,10 @@ if __name__ == "__main__":
     #segmentation step
     output_seg = args.dir_file + args.prefixe + 'lsms_seg.tif'
     smooth_img = Raster(args.filtered_file)
-    pos_file = Raster(args.pos_file)
-    seg_img = smooth_img.lsms_seg (pos_file, output_seg, args.spatialr, 
-                                   args.ranger)
+    pos_img = Raster(args.pos_file)
+    seg_img = smooth_img.lsms_seg (pos_img, output_seg, args.spatialr, 
+                                   args.ranger, tilesizex = args.tilesizex,
+                                   tilesizey = args.tilesizey)
                                    
     print "segmentation step has been realized succesfully"
     
