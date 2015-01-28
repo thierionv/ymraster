@@ -32,27 +32,23 @@ if __name__ == "__main__":
     parser.add_argument("--tilesizey", "-ty",help="Size of tiles along the "+
                         "Y-axis (default value is 256)", type = int, default =
                         256)
-    parser.add_argument("-pref", "--prefixe", help ="Prefixe to add to the " +
-                        "file to be written", default = "", type = str)
-    parser.add_argument("-dir","--dir_file", default = "", help = "Path of "+
-                        "the folder where the outputs will be written" )    
+    parser.add_argument("-out", "--out_file", help ="Name of the output file",
+                        required = True, type = str)
+    parser.add_argument("-d","--dir", default = "", help = "Path of the " +
+                        "folder where the output will be written. The \"/\"" +
+                        " or \"\\\" have to be added at the end.")   
     args = parser.parse_args()
-                
-    #Symbol to add in function of the optional parse arguments, to have a 
-    #proper path
-    if args.dir_file:
-        args.dir_file += '/'
-    if args.prefixe:
-        args.prefixe += '_'
     print args
     
-    #merging small regions 
+    #set of the instances and the output name
     seg_img = Raster(args.seg_file)
     smooth_img = Raster(args.filtered_file)
-    output_merged = args.dir_file + args.prefixe + 'lsms_merged.tif'
+    output_merged = args.dir + args.out_file
+    
+    #Execution of the method
     merged_img = seg_img.lsms_merging(smooth_img, output_merged, 
                                           args.minsize, tilesizex = \
                                           args.tilesizex,tilesizey = \
                                           args.tilesizey)
-    print "merging step has been realized succesfully"
+    print "merge has been realized succesfully"
     
