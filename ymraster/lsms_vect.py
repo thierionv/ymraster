@@ -21,6 +21,12 @@ if __name__ == "__main__":
                         " image.",required = True)
     parser.add_argument("--seg_file", "-seg", help="Path of the segmented" +
                         " image.",required = True)
+    parser.add_argument("--tilesizex", "-tx",help="Size of tiles along the "+
+                        "X-axis (default value is 256)", type = int, default =
+                        256)
+    parser.add_argument("--tilesizey", "-ty",help="Size of tiles along the "+
+                        "Y-axis (default value is 256)", type = int, default =
+                        256)
     parser.add_argument("-pref", "--prefixe", help ="Prefixe to add to the " +
                         "file to be written", default = "", type = str)
     parser.add_argument("-dir","--dir_file", default = "", help = "Path of "+
@@ -39,5 +45,6 @@ if __name__ == "__main__":
     output_vector = args.dir_file + args.prefixe + 'lsms_vect.shp'
     merged_img = Raster(args.seg_file)
     xs = Raster(args.xs_file)
-    merged_img.lsms_vectorisation(xs, output_vector)
+    merged_img.lsms_vectorisation(xs, output_vector, tilesizex = \
+                                    args.tilesizex,tilesizey = args.tilesizey)
     print "vectorisation step has been realized succesfully"
