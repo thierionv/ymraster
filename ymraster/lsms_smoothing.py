@@ -65,5 +65,6 @@ if __name__ == "__main__":
                                            output_spatial_image, thres = 
                                            args.thres, rangeramp = 
                                            args.rangeramp, maxiter = 
-                                           args.maxiter)    
+                                           args.maxiter, modesearch = 
+                                           args.modesearch)    
     print "smoothing step has been realized succesfully"
