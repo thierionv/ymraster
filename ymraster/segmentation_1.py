@@ -47,12 +47,14 @@ if __name__ == "__main__":
                         " colorimetry of the filtered pixel : y = rangeramp" +
                         " * x + ranger(default value is 0).", type = float,
                          default = 0)
-    parser.add_argument("--modesearch", "-mos", help="Mean shift vector threshold ",
-                        type = int, default = 0)
+    parser.add_argument("--modesearch", "-mos", help="Mean shift vector thres"+
+                        "hold (default value is 0)",type = int,default = 0)
     parser.add_argument("--tilesizex", "-tx",help="Size of tiles along the "+
-                        "X-axis, by default 256", type = int, default = 256)
+                        "X-axis (default value is 256)", type = int, default =
+                        256)
     parser.add_argument("--tilesizey", "-ty",help="Size of tiles along the "+
-                        "Y-axis, by default 256", type = int, default = 256)
+                        "Y-axis (default value is 256)", type = int, default =
+                        256)
     parser.add_argument("--mstep", "-m",help="Do the merge step if notified",
                         action = "store_true")
     parser.add_argument("--minsize", "-ms",help="minimum size of a label",
