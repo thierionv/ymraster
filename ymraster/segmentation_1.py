@@ -104,7 +104,7 @@ if __name__ == "__main__":
     
     #Execution of the method
     ndvi_img = fus_img.ndvi(output_ndvi, args.idx_red, args.idx_nir)
-    print "Writting the ndvi imgage has been realized succesfully\n"    
+    print "Writting the ndvi image has been realized succesfully\n"    
 
     #---------------------------    
     #---extraction (optional)---
