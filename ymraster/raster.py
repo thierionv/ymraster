@@ -1,29 +1,30 @@
 # -*- coding: utf-8 -*-
 
 """
-Raster manipulation library
-===========================
+A Raster manipulation library
+=============================
 
-This module contains classes for manipulating raster images. It is based on:
+The ``ymraster`` module contains classes for manipulating raster images.
 
-    * GDAL_ for general raster reading,
+It is based on:
 
-    * NumPy_ for computations,
-
-    * rasterio_ for reading and writing raster efficiently
-
-    * OTB_ for merge, concatenate and segmentation operations
-
-:: _GDAL: http://gdal.org/
-:: _NumPy: http://www.numpy.org/
-:: _rasterio: https://github.com/mapbox/rasterio
-:: _OTB: http://www.orfeo-toolbox.org/CookBook/
+* `OTB <http://www.orfeo-toolbox.org/CookBook/>`_ for most raster operations,
+* `GDAL <http://gdal.org/>`_ for reading and writing rasters metadata,
+* `NumPy <http://www.numpy.org/>`_ for matrix computations,
+* `rasterio <https://github.com/mapbox/rasterio>`_ for reading and saving
+  rasters efficiently.
 
 
 The ``Raster`` class
 --------------------
 
-The ``Raster`` class define an Image readed from a file.
+A ``Raster`` instance represents a raster read from a file.
+
+>>> raster = Raster('tests/data/RGB.byte.tif')
+
+
+Module reference
+================
 """
 
 try:
@@ -89,14 +90,16 @@ def concatenate_images(rasters, out_filename):
 
     All bands in all input rasters must have same size.
 
-    Moreover, this function is quite conservative about projection: all bands
-    should have the same
+    Moreover, this function is quite conservative about projections: all bands
+    should have the same projection
 
     Finally, if data types are different, then everything will be converted to
     the default data type in OTB (_float_ currently).
 
-    :param rasters: list of Raster objects to concatenate
-    :param out_filename: path to the file to write the concatenation in
+    :param rasters: the ``Raster`` instances to concatenate
+    :type rasters: list of ``Raster`` instances
+    :param out_filename: path to the output file
+    :type out_filename: str to the output file
     """
     # Check for size, proj, transform & type (and that list not empty)
     raster0 = rasters[0]
@@ -127,9 +130,9 @@ class Raster():
     """Represents a raster image that was read from a file
 
     The whole raster *is not* loaded into memory. Instead this class records
-    useful information about the raster (number and position of bands,
-    resolution, ...) and provide useful methods for comparing rasters,
-    computing some indices, etc.
+    useful information about the raster (number and size of bands, projection,
+    etc.) and provide useful methods for comparing rasters, computing some
+    indices, etc.
 
     """
 
@@ -164,7 +167,9 @@ class Raster():
         ds = None
 
     def array(self):
-        """Return a Numpy array corresponding to the image"""
+        """Return a NumPy array corresponding to the raster
+
+        :rtype: numpy.ndarray"""
         # Initialize an empty array of correct size and type
         array = np.empty((self.meta['height'],
                           self.meta['width'],
@@ -179,10 +184,10 @@ class Raster():
         return array
 
     def set_projection(self, srs):
-        """Write the given projection into to file metadata
+        """Write the given projection into the raster's metadata
 
-        :param srs: osgeo.osr.SpatialReference object that represents the
-        projection to set
+        :param srs: projection to set
+        :type srs: osgeo.osr.SpatialReference
         """
         ds = gdal.Open(self.filename, gdal.GA_Update)
         ds.SetProjection(srs.ExportToWkt())
@@ -190,10 +195,15 @@ class Raster():
         self.meta['srs'] = srs
 
     def remove_band(self, idx, out_filename):
-        """Write a new image with the band at the given index removed
+        """Write a new raster (in the specified output file) which is the same
+        than the current raster, except that the band at the given index is
+        removed, and return the corresponding ``Raster`` object.
 
         :param idx: index of the band to remove (starts at 1)
+        :type idx: int
         :param out_filename: path to the output file
+        :type out_filename: str
+        :rtype: ``Raster``
         """
         # Split the N-bands image into N mono-band images (in temp folder)
         SplitImage = otb.Registry.CreateApplication("SplitImage")
@@ -223,12 +233,16 @@ class Raster():
 
         return Raster(out_filename)
 
-    def fusion(self, pan, output_image):
-        """ Write the merge result between the two images of a bundle, using
-        the BundleToPerfectSensor OTB application
+    def fusion(self, pan, out_filename):
+        """Sharpen the raster with a more detailed panchromatic image, save the
+        result into the specified output file, and return the corresponding
+        ``Raster`` object
 
-        pan : a Raster instance of the panchromatic image
-        output_image : path and name of the output image
+        :param pan: panchromatic image to use for sharpening
+        :type pan: ``Raster``
+        :param out_filename: path to the output file
+        :type out_filename: str
+        :rtpye: ``Raster``
         """
         assert (self.meta['srs'] is not None
                 and pan.meta['srs'] is not None
@@ -240,20 +254,24 @@ class Raster():
         Pansharpening = otb.Registry.CreateApplication("BundleToPerfectSensor")
         Pansharpening.SetParameterString("inp", pan.filename)
         Pansharpening.SetParameterString("inxs", self.filename)
-        Pansharpening.SetParameterString("out", output_image)
+        Pansharpening.SetParameterString("out", out_filename)
         # Pansharpening.SetParameterOutputImagePixelType("out", 3)
         Pansharpening.ExecuteAndWriteOutput()
 
-        return Raster(output_image)
+        return Raster(out_filename)
 
     @fix_missing_proj
     def ndvi(self, out_filename, idx_red, idx_nir):
-        """Write the NDVI of the image into the given output file and
-        return the corresponding Raster object. Indexation starts at 1.
+        """Write the Normalized Difference Vegetation Index (NDVI) of the raster
+        into the specified output file and return the corresponding Raster
+        object.
 
         :param out_filename: path to the output file
-        :param idx_red: index of the red band
-        :param idx_nir: index of the near infrared band
+        :type out_filename: str
+        :param idx_red: index of a red band (starts at 1)
+        :type idx_red: int
+        :param idx_nir: index of a near-infrared band (starts at 1)
+        :type idx_nir: int
         """
         RadiometricIndices = otb.Registry.CreateApplication(
             "RadiometricIndices")
@@ -310,18 +328,21 @@ class Raster():
 
     ndsi = mndwi
 
-    def concatenate(self, list_im, output_image):
-        """Concatenate a list of images of the same size into a single
-        multi-band image,
+    def concatenate(self, rasters, out_filename):
+        """Append into the specifed output file:
+            * the current raster, *and*
+            * a list of rasters of the same size
+        and return the corresponding ``Raster`` object.
 
-        list_im : a list of raster instances
-        output_image : path and name of the output image
+        :param rasters: a list of rasters to append after the current raster
+        :type rasters: list of ``Raster``
+        :param out_filename: path to the output file
+        :type out_filename: str
+        :rtype: ``Raster``
         """
-        rasters = [self]
-        rasters.extend(list_im)
-        concatenate_images(rasters, output_image)
-
-        return Raster(output_image)
+        list_ = [self] + rasters
+        concatenate_images(list_, out_filename)
+        return Raster(out_filename)
 
     def lsms_smoothing(self, output_filtered_image, spatialr, ranger,
                        output_spatial_image, thres=0.1, rangeramp=0,
@@ -399,13 +420,12 @@ class Raster():
         LSMSSmallRegionsMerging otb application. It returns a Raster instance
         of the merged image.
 
-        :param in_smooth : Raster instance of the smoothed image, resulting
-        from the step 1
-        :param output_merged : path and name of the output merged segmented
-        image to be written
-        :param minsize : Int, minimum size of a label
-        :param tilesizex : Int, Size of tiles along the X-axis, by default 256
-        :param tilesizey : Int, Size of tiles along the Y-axis, by default 256
+        :param in_smooth: smoothed image from the step 1
+        :param output_merged: path and name of the output merged segmented
+                              image to be written
+        :param minsize: Int, minimum size of a label
+        :param tilesizex: Int, Size of tiles along the X-axis, by default 256
+        :param tilesizey: Int, Size of tiles along the Y-axis, by default 256
         """
 
         LSMSSmallRegionsMerging = otb.Registry.CreateApplication(
