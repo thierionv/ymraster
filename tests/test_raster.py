@@ -180,6 +180,52 @@ class TestArrayToRaster(unittest.TestCase):
             os.remove(os.path.join(tmpdir, filename))
 
 
+class TestRaster(unittest.TestCase):
+
+    def setUp(self):
+        self.filename = 'tests/data/RGB.byte.tif'
+        self.raster = Raster(self.filename)
+
+    def test_should_get_attr_values_of_raster(self):
+        self.assertEqual(self.raster.filename, self.filename)
+        self.assertEqual(self.raster.meta['count'], 3)
+        self.assertEqual(
+            self.raster.meta['srs'].ExportToWkt(),
+            'PROJCS["UTM Zone 18, Northern Hemisphere",GEOGCS["Unknown datum '
+            'based upon the WGS 84 ellipsoid",DATUM["Not_specified_based_on'
+            '_WGS_84_spheroid",SPHEROID["WGS 84",6378137,298.257223563,'
+            'AUTHORITY["EPSG","7030"]]],PRIMEM["Greenwich",0],UNIT["degree",'
+            '0.0174532925199433]],PROJECTION["Transverse_Mercator"],'
+            'PARAMETER["latitude_of_origin",0],PARAMETER["central_meridian",'
+            '-75],PARAMETER["scale_factor",0.9996],PARAMETER["false_easting",'
+            '500000],PARAMETER["false_northing",0],UNIT["metre",1,'
+            'AUTHORITY["EPSG","9001"]]]')
+        self.assertEqual(self.raster.meta['dtype'].lstr_dtype, 'uint8')
+        self.assertEqual(self.raster.meta['driver'].GetDescription(), u'GTiff')
+        self.assertEqual(self.raster.meta['transform'], (101985.0,
+                                                         300.0379266750948,
+                                                         0.0,
+                                                         2826915.0,
+                                                         0.0,
+                                                         -300.041782729805))
+        self.assertEqual(self.raster.meta['height'], 718)
+        self.assertEqual(self.raster.meta['width'], 791)
+
+    def test_raster_should_raise_runtime_error_on_missing_file(self):
+        filename = 'tests/data/not_exists.tif'
+        self.assertRaises(RuntimeError, Raster, filename)
+
+    def test_raster_should_raise_runtime_error_on_wrong_type_file(self):
+        filename = 'tests/data/foo.txt'
+        self.assertRaises(RuntimeError, Raster, filename)
+
+    def test_should_get_array_of_raster(self):
+        array = self.raster.array()
+        self.assertEqual(array.ndim, 3)
+        self.assertEqual(array.shape, (718, 791, 3))
+        self.assertEqual(array.dtype, 'UInt8')
+
+
 class TestConcatenateImages(unittest.TestCase):
 
     def setUp(self):
@@ -390,52 +436,10 @@ class TestOtbFunctions(unittest.TestCase):
             os.remove(os.path.join(tmpdir, filename))
 
 
-class TestRealRaster(unittest.TestCase):
-
-    def setUp(self):
-        self.filename = 'tests/data/RGB.byte.tif'
-        self.raster = Raster(self.filename)
-
-    def test_should_get_attr_values_of_raster(self):
-        self.assertEqual(self.raster.filename, self.filename)
-        self.assertEqual(self.raster.meta['count'], 3)
-        self.assertEqual(
-            self.raster.meta['srs'].ExportToWkt(),
-            'PROJCS["UTM Zone 18, Northern Hemisphere",GEOGCS["Unknown datum '
-            'based upon the WGS 84 ellipsoid",DATUM["Not_specified_based_on'
-            '_WGS_84_spheroid",SPHEROID["WGS 84",6378137,298.257223563,'
-            'AUTHORITY["EPSG","7030"]]],PRIMEM["Greenwich",0],UNIT["degree",'
-            '0.0174532925199433]],PROJECTION["Transverse_Mercator"],'
-            'PARAMETER["latitude_of_origin",0],PARAMETER["central_meridian",'
-            '-75],PARAMETER["scale_factor",0.9996],PARAMETER["false_easting",'
-            '500000],PARAMETER["false_northing",0],UNIT["metre",1,'
-            'AUTHORITY["EPSG","9001"]]]')
-        self.assertEqual(self.raster.meta['dtype'].lstr_dtype, 'uint8')
-        self.assertEqual(self.raster.meta['driver'].GetDescription(), u'GTiff')
-        self.assertEqual(self.raster.meta['transform'], (101985.0,
-                                                         300.0379266750948,
-                                                         0.0,
-                                                         2826915.0,
-                                                         0.0,
-                                                         -300.041782729805))
-        self.assertEqual(self.raster.meta['height'], 718)
-        self.assertEqual(self.raster.meta['width'], 791)
-
-    def test_should_get_array_of_raster(self):
-        array = self.raster.array()
-        self.assertEqual(array.ndim, 3)
-        self.assertEqual(array.shape, (718, 791, 3))
-        self.assertEqual(array.dtype, 'UInt8')
-
-    def test_raster_should_raise_runtime_error_on_missing_file(self):
-        filename = 'tests/data/not_exists.tif'
-        self.assertRaises(RuntimeError, Raster, filename)
-
-
 def suite():
     suite = unittest.TestSuite()
     load_from = unittest.defaultTestLoader.loadTestsFromTestCase
-    suite.addTests(load_from(TestRealRaster))
+    suite.addTests(load_from(TestRaster))
     return suite
 
 
