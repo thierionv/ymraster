@@ -155,7 +155,7 @@ if __name__ == "__main__":
         output_seg = os.path.join(args.dir, args.out_file)
     else:
         output_seg = os.path.join(args.dir, tail + '_lsms_seg.tif')
-    seg_img = smooth_img.lsms_seg (pos_img, output_seg, args.spatialr, 
+    seg_img = smooth_img.lsms_segmentation(pos_img, output_seg, args.spatialr, 
                                    args.ranger, tilesizex = args.tilesizex,
                                    tilesizey = args.tilesizey)
     print "segmentation step has been realized succesfully"
@@ -177,6 +177,6 @@ if __name__ == "__main__":
     #fourth step (optional) : vectorization
     if args.vstep: 
         output_vector = os.path.join(args.dir, args.out_file)
-        merged_img.lsms_vectorisation(concat_img, output_vector, tilesizex = \
+        merged_img.lsms_vectorization(concat_img, output_vector, tilesizex = \
                                     args.tilesizex,tilesizey = args.tilesizey)
-        print "vectorisation step has been realized succesfully"
+        print "vectorization step has been realized succesfully"

@@ -41,6 +41,6 @@ if __name__ == "__main__":
     xs = Raster(args.xs_file)
     
     #Execution of the method
-    merged_img.lsms_vectorisation(xs, output_vector, tilesizex = \
+    merged_img.lsms_vectorization(xs, output_vector, tilesizex = \
                                     args.tilesizex,tilesizey = args.tilesizey)
     print "Vectorization has been realized succesfully"

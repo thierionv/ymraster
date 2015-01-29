@@ -50,7 +50,7 @@ if __name__ == "__main__":
     pos_img = Raster(args.pos_file)
     
     #Execution of the method
-    seg_img = smooth_img.lsms_seg (pos_img, output_seg, args.spatialr, 
+    seg_img = smooth_img.lsms_segmentation (pos_img, output_seg, args.spatialr, 
                                    args.ranger, tilesizex = args.tilesizex,
                                    tilesizey = args.tilesizey)
                                    
