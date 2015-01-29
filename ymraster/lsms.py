@@ -8,8 +8,9 @@ if __name__ == "__main__":
     """
     """
     import argparse
+    import os
     from ymraster import *
-     
+    
     #Set of the parse arguments
     parser = argparse.ArgumentParser(description= "Perform a Large-Scale Mean"+
                                     "-Shift segmentation in four step:  a " +
@@ -50,33 +51,30 @@ if __name__ == "__main__":
                         type = int)
     parser.add_argument("--vstep", "-v",help="Do the vectorisation step if "+
                         "notified", action = "store_true")
-    parser.add_argument("-pref", "--prefixe", help ="Prefixe to add to the " +
-                        "file to be written", default = "", type = str)
-    parser.add_argument("-dir","--dir_file", default = "", help = "Path of "+
-                        "the folder where the outputs will be written" )
+    parser.add_argument("-out", "--out_file", help ="Name of the output file",
+                        required = True, type = str)
+    parser.add_argument("-d","--dir", default = "", help = "Path of the " +
+                        "folder where the outputs will be written. The \"/\"" +
+                        " or \"\\\" have to be added at the end.")
     args = parser.parse_args()
     
     #control the coherency of the arguments
     if not(args.mstep) and args.minsize:
-        print "Warning : --msize shouldn't be specified without --mstep"
-        
-    
-    #Symbol to add in function of the optional parse arguments, to have a 
-    #proper path
-    if args.dir_file:
-        args.dir_file += '/'
-    if args.prefixe:
-        args.prefixe += '_'
+        print "Warning : --msize shouldn't be specified without --mstep\n"    
     print args
     
+    #Extraction of the input file name
+    head, ext = os.path.splitext(args.xs_file)
+    tail = os.path.basename(head)
+
     #first step : smoothing
     xs = Raster(args.xs_file)
-    output_filtered_image = args.dir_file + args.prefixe + "_spr_" + \
+    output_filtered_image = args.dir + tail + "_spr_" + \
                             str(args.spatialr) + "_rg_" + str(args.ranger) + \
                             "_max_" + str(args.maxiter) + "_rga_" + \
                             str(args.rangeramp) + "_th_" + str(args.thres)\
                             + "filtered.tif"
-    output_spatial_image = args.dir_file + args.prefixe + 'spatial.tif'
+    output_spatial_image = args.dir + tail + '_spatial.tif'
     smooth_img,pos_img = xs.lsms_smoothing(output_filtered_image, 
                                            args.spatialr, args.ranger,
                                            output_spatial_image, thres = 
@@ -87,7 +85,10 @@ if __name__ == "__main__":
     print "smoothing step has been realized succesfully"
     
     #second step : segmentation
-    output_seg = args.dir_file + args.prefixe + 'lsms_seg.tif'
+    if not(args.mstep or args.vstep):#If this is the final outup or not
+        output_seg = args.dir + args.out_file
+    else:        
+        output_seg = args.dir + tail + '_lsms_seg.tif'
     seg_img = smooth_img.lsms_seg (pos_img, output_seg, args.spatialr, 
                                    args.ranger, tilesizex = args.tilesizex,
                                    tilesizey = args.tilesizey)
@@ -95,7 +96,10 @@ if __name__ == "__main__":
     
     #third step (optional) : merging small regions
     if args.mstep: 
-        output_merged = args.dir_file + args.prefixe + 'lsms_merged.tif'
+        if not args.vstep: #If this is the final outup or not
+            output_merged = args.dir + args.out_file
+        else:
+            output_merged = args.dir + tail + '_lsms_merged.tif'
         merged_img = seg_img.lsms_merging(smooth_img, output_merged, 
                                           args.minsize, tilesizex = \
                                           args.tilesizex,tilesizey = \
@@ -105,7 +109,7 @@ if __name__ == "__main__":
         merged_img = seg_img
     #fourth step (optional) : vectorization
     if args.vstep: 
-        output_vector = args.dir_file + args.prefixe + 'lsms_vect.shp'
+        output_vector = args.dir + args.out_file
         merged_img.lsms_vectorisation(xs, output_vector, tilesizex = \
                                     args.tilesizex,tilesizey = args.tilesizey)
         print "vectorisation step has been realized succesfully"
