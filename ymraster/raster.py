@@ -64,25 +64,31 @@ def _save_array(array, out_filename, meta):
 
 
 def concatenate_images(rasters, out_filename):
-    """Write an image which is the concatenation of the given rasters in order
+    """Write a raster which is the concatenation of the given rasters, in order
 
-    All bands in all input rasters must have same size
+    All bands in all input rasters must have same size.
 
-    Moreover, if data types are different, then everything will be converted to
+    Moreover, this function is quite conservative about projection: all bands
+    should have the same
+
+    Finally, if data types are different, then everything will be converted to
     the default data type in OTB (_float_ currently).
 
-    :param filenames: list of Raster objects to concatenate
+    :param rasters: list of Raster objects to concatenate
     :param out_filename: path to the file to write the concatenation in
     """
-    # Check for size and type (and that rasters list is not empty)
+    # Check for size, proj, transform & type (and that list not empty)
     raster0 = rasters[0]
-    width, height = (raster0.meta['width'], raster0.meta['height'])
-    otb_dtype = raster0.meta['dtype'].otb_dtype
+    srs, otb_dtype = (raster0.meta['srs'], raster0.meta['dtype'].otb_dtype)
+    assert srs is not None, \
+        "Image has no Coordinate Reference System : '{}'".format(
+            raster0.filename)
     same_type = True
     for raster in rasters:
-        assert raster.meta['width'] == width \
-            and raster.meta['height'] == height, \
-            "Images have not same size : '{}' and '{}'".format(raster0, raster)
+        assert raster.meta['srs'] is not None \
+            and raster.meta['srs'].IsSame(srs), \
+            "Images have not the same Coordinate Reference System : "
+        "'{}' and '{}'".format(raster0.filename, raster.filename)
         if raster.meta['dtype'].otb_dtype != otb_dtype:
             same_type = False
 
@@ -316,6 +322,13 @@ class Raster():
         pan : a Raster instance of the panchromatic image
         output_image : path and name of the output image
         """
+        assert (self.meta['srs'] is not None
+                and pan.meta['srs'] is not None
+                and self.meta['srs'].IsSame(pan.meta['srs'])) \
+            or (self.meta['srs'] is None
+                and pan.meta['srs'] is None), \
+            "Images have not the same Coordinate Reference System : "
+        "'{}' and '{}'".format(self.filename, pan.filename)
         Pansharpening = otbApplication.Registry.CreateApplication(
             "BundleToPerfectSensor")
         Pansharpening.SetParameterString("inp", pan.filename)

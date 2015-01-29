@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import unittest
-# import mock
 import tempfile
 
 from ymraster import _save_array, concatenate_images, Raster
@@ -186,7 +185,7 @@ class TestConcatenateImages(unittest.TestCase):
     def setUp(self):
         self.folder = 'tests/data'
 
-    def test_concatenate_should_work_when_same_type_same_proj(self):
+    def test_concatenate_should_work_when_same_size_same_proj(self):
         rasters = [Raster(os.path.join(self.folder, filename))
                    for filename in os.listdir(self.folder)
                    if filename.startswith('l8_')
@@ -202,11 +201,11 @@ class TestConcatenateImages(unittest.TestCase):
                             dtype=rasters[0].meta['dtype'].ustr_dtype,
                             proj=rasters[0].meta['srs'].ExportToProj4())
 
-    def test_concatenate_should_raise_assertion_error_if_not_same_size(self):
-        rasters = [Raster(os.path.join(self.folder, 'RGB.byte.tif')),
-                   Raster(os.path.join(self.folder, 'float.tif'))]
+    def test_concatenate_should_raise_runtime_error_if_not_same_size(self):
+        rasters = [Raster(os.path.join(self.folder, 'shade.tif')),
+                   Raster(os.path.join(self.folder, 'shade_crop.tif'))]
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
-        self.assertRaises(AssertionError, concatenate_images, rasters,
+        self.assertRaises(RuntimeError, concatenate_images, rasters,
                           out_file.name)
 
     def test_concatenate_should_raise_assertion_error_if_not_same_proj(self):
@@ -221,23 +220,24 @@ class TestFusion(unittest.TestCase):
 
     def setUp(self):
         self.ms = Raster('tests/data/Spot6_MS_31072013.tif')
-        self.pan = Raster('tests/data/Spot6_Pan_31072013.tif')
 
     def test_fusion_should_work_if_same_date_same_projection(self):
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
-        self.ms.fusion(self.pan, out_file.name)
+        pan = Raster('tests/data/Spot6_Pan_31072013.tif')
+        self.ms.fusion(pan, out_file.name)
         _check_output_image(tester=self,
                             filename=out_file.name,
                             driver=u'GTiff',
-                            width=self.pan.meta['width'],
-                            height=self.pan.meta['height'],
+                            width=pan.meta['width'],
+                            height=pan.meta['height'],
                             number_bands=self.ms.meta['count'],
                             dtype='Float32',
                             proj=self.ms.meta['srs'].ExportToProj4())
 
     def test_fusion_should_raise_assertion_error_if_not_same_proj(self):
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
-        self.assertRaises(AssertionError, self.ms.fusion, self.pan,
+        pan = Raster('tests/data/Spot6_Pan_31072013_unproj.tif')
+        self.assertRaises(AssertionError, self.ms.fusion, pan,
                           out_file.name)
 
     def tearDown(self):
