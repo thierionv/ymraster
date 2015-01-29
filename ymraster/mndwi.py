@@ -7,9 +7,9 @@ from ymraster import Raster
 def compute_ndvi():
     # Command-line parameters
     parser = argparse.ArgumentParser(
-        description="Compute Normalized Difference Vegetation Index (NDVI) "
-        "of the input image and save it into the specified output file. "
-        "Indices of red and near-infrared bands must be given "
+        description="Compute Modified Normalized Difference Water Index (MNDWI)"
+        " of the input image and save it into the specified output file. "
+        "Indices of green and middle-infrared bands must be given "
         "(indices start at 1).")
     parser.add_argument("-i", "--in_file", help="Path to the input image",
                         required=True)
