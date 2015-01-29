@@ -10,6 +10,7 @@ if __name__ == "__main__":
     """
     
     import argparse
+    import os
     from ymraster import *
     
     #Set of the parse arguments
@@ -26,17 +27,16 @@ if __name__ == "__main__":
     parser.add_argument("-out", "--out_file", help ="Name of the output file",
                         required = True, type = str)
     parser.add_argument("-d","--dir", default = "", help = "Path of the " +
-                        "folder where the output will be written. The \"/\"" +
-                        " or \"\\\" have to be added at the end.")
+                        "folder where the output will be written.")
     args = parser.parse_args()
     print args
 
     
     
-    #set of the instances and the output name    
+    #set of the instances and the output file name    
     spot_xs = Raster(args.xs_file)
     spot_pan = Raster(args.pan_file)
-    output_fusion = args.dir + args.out_file 
+    output_fusion = os.path.join(args.dir, args.out_file)
     
     #Execution of the method
     fus_img = spot_xs.fusion(spot_pan,output_fusion)
