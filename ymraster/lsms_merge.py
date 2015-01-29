@@ -9,6 +9,7 @@ if __name__ == "__main__":
     """
     """
     import argparse
+    import os
     from ymraster import *
      
     #Set of the parse arguments
@@ -35,20 +36,19 @@ if __name__ == "__main__":
     parser.add_argument("-out", "--out_file", help ="Name of the output file",
                         required = True, type = str)
     parser.add_argument("-d","--dir", default = "", help = "Path of the " +
-                        "folder where the output will be written. The \"/\"" +
-                        " or \"\\\" have to be added at the end.")   
+                        "folder where the output will be written.")   
     args = parser.parse_args()
     print args
     
     #set of the instances and the output name
     seg_img = Raster(args.seg_file)
     smooth_img = Raster(args.filtered_file)
-    output_merged = args.dir + args.out_file
+    output_merged = os.path.join(args.dir, args.out_file)
     
     #Execution of the method
     merged_img = seg_img.lsms_merging(smooth_img, output_merged, 
                                           args.minsize, tilesizex = \
                                           args.tilesizex,tilesizey = \
                                           args.tilesizey)
-    print "merge has been realized succesfully"
+    print "Merge has been realized succesfully"
     

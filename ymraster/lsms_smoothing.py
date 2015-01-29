@@ -9,6 +9,7 @@ if __name__ == "__main__":
     """
     """
     import argparse
+    import os
     from ymraster import *
      
     #Set of the parse arguments
@@ -42,15 +43,14 @@ if __name__ == "__main__":
                         " to the filetered image and the spatial image" ,
                         required = True, type = str, nargs = 2)
     parser.add_argument("-d","--dir", default = "", help = "Path of the " +
-                        "folder where the output will be written. The \"/\"" +
-                        " or \"\\\" have to be added at the end.")
+                        "folder where the output will be written.")
     args = parser.parse_args()
     print args
     
     #set of the instance and output names
     xs = Raster(args.xs_file)
-    output_filtered_image = args.dir + args.out_file[0]
-    output_spatial_image = args.dir + args.out_file[1]
+    output_filtered_image = os.path.join(args.dir, args.out_file[0])
+    output_spatial_image = os.path.join(args.dir, args.out_file[1])
     
     #Execution of the method
     smooth_img,pos_img = xs.lsms_smoothing(output_filtered_image, 

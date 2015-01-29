@@ -9,6 +9,7 @@ if __name__ == "__main__":
     """
     """
     import argparse
+    import os
     from ymraster import *
      
     #Set of the parse arguments
@@ -39,18 +40,17 @@ if __name__ == "__main__":
     parser.add_argument("-out", "--out_file", help ="Name of the output file",
                         required = True, type = str)
     parser.add_argument("-d","--dir", default = "", help = "Path of the " +
-                        "folder where the output will be written. The \"/\"" +
-                        " or \"\\\" have to be added at the end.")
+                        "folder where the output will be written.")
     args = parser.parse_args()
     print args
     
     #set of the instances and the output name
-    output_seg = args.dir + args.out_file 
+    output_seg = os.path.join(args.dir, args.out_file)
     smooth_img = Raster(args.filtered_file)
     pos_img = Raster(args.pos_file)
     
     #Execution of the method
-    seg_img = smooth_img.lsms_seg (pos_img, output_seg, args.spatialr, 
+    seg_img = smooth_img.lsms_segmentation (pos_img, output_seg, args.spatialr, 
                                    args.ranger, tilesizex = args.tilesizex,
                                    tilesizey = args.tilesizey)
                                    

@@ -10,6 +10,7 @@ if __name__ == "__main__":
     """
     
     import argparse
+    import os
     from ymraster import *
     
     #Set of the parse arguments
@@ -23,14 +24,14 @@ if __name__ == "__main__":
     parser.add_argument("-out", "--out_file", help ="Name of the output file",
                         required = True, type = str)
     parser.add_argument("-d","--dir", default = "", help = "Path of the " +
-                        "folder where the output will be written. The \"/\"" +
-                        " or \"\\\" have to be added at the end.")
+                        "folder where the output will be written.")
     args = parser.parse_args()
     print args
     
-    output_rmv = args.dir + args.out_file           
-    #set of the instance    
+    
+    #set of the instance and the output file name   
     spot_xs = Raster(args.xs_file)
+    output_rmv = os.path.join(args.dir, args.out_file)
     
     #Execution of the method
     rmv_img = spot_xs.remove_band(args.idx, output_rmv)

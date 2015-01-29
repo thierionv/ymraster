@@ -362,7 +362,7 @@ class Raster():
 
         return Raster(output_filtered_image), Raster(output_spatial_image)
 
-    def lsms_seg(self, input_pos_img, output_seg_image, spatialr, ranger,
+    def lsms_segmentation(self, input_pos_img, output_seg_image, spatialr, ranger,
                  tilesizex=256, tilesizey=256):
         """Second step of LSMS : produce a labeled image with different clusters,
         according to the range and spatial proximity of the pixels, using the
@@ -429,7 +429,7 @@ class Raster():
 
         return Raster(output_merged)
 
-    def lsms_vectorisation(self, in_image, output_vector, tilesizex=256,
+    def lsms_vectorization(self, in_image, output_vector, tilesizex=256,
                            tilesizey=256):
         """Final step of LSMS : convert a label image to a GIS vector file
         containing one polygon per segment, using the LSMSVectorization otb
