@@ -54,8 +54,7 @@ if __name__ == "__main__":
     parser.add_argument("-out", "--out_file", help ="Name of the output file",
                         required = True, type = str)
     parser.add_argument("-d","--dir", default = "", help = "Path of the " +
-                        "folder where the outputs will be written. The \"/\"" +
-                        " or \"\\\" have to be added at the end.")
+                        "folder where the outputs will be written.")
     args = parser.parse_args()
     
     #control the coherency of the arguments
@@ -69,12 +68,12 @@ if __name__ == "__main__":
 
     #first step : smoothing
     xs = Raster(args.xs_file)
-    output_filtered_image = args.dir + tail + "_spr_" + \
+    output_filtered_image = os.path.join(args.dir, tail + "_spr_" + \
                             str(args.spatialr) + "_rg_" + str(args.ranger) + \
                             "_max_" + str(args.maxiter) + "_rga_" + \
                             str(args.rangeramp) + "_th_" + str(args.thres)\
-                            + "filtered.tif"
-    output_spatial_image = args.dir + tail + '_spatial.tif'
+                            + "filtered.tif")
+    output_spatial_image = os.path.join(args.dir, tail + '_spatial.tif')
     smooth_img,pos_img = xs.lsms_smoothing(output_filtered_image, 
                                            args.spatialr, args.ranger,
                                            output_spatial_image, thres = 
@@ -86,9 +85,9 @@ if __name__ == "__main__":
     
     #second step : segmentation
     if not(args.mstep or args.vstep):#If this is the final outup or not
-        output_seg = args.dir + args.out_file
+        output_seg = os.path.join(args.dir, args.out_file)
     else:        
-        output_seg = args.dir + tail + '_lsms_seg.tif'
+        output_seg = os.path.join(args.dir, tail + '_lsms_seg.tif')
     seg_img = smooth_img.lsms_seg (pos_img, output_seg, args.spatialr, 
                                    args.ranger, tilesizex = args.tilesizex,
                                    tilesizey = args.tilesizey)
@@ -97,9 +96,9 @@ if __name__ == "__main__":
     #third step (optional) : merging small regions
     if args.mstep: 
         if not args.vstep: #If this is the final outup or not
-            output_merged = args.dir + args.out_file
+            output_merged = os.path.join(args.dir, args.out_file)
         else:
-            output_merged = args.dir + tail + '_lsms_merged.tif'
+            output_merged = os.path.join(args.dir, tail + '_lsms_merged.tif')
         merged_img = seg_img.lsms_merging(smooth_img, output_merged, 
                                           args.minsize, tilesizex = \
                                           args.tilesizex,tilesizey = \
@@ -109,7 +108,7 @@ if __name__ == "__main__":
         merged_img = seg_img
     #fourth step (optional) : vectorization
     if args.vstep: 
-        output_vector = args.dir + args.out_file
+        output_vector = os.path.join(args.dir, args.out_file)
         merged_img.lsms_vectorisation(xs, output_vector, tilesizex = \
                                     args.tilesizex,tilesizey = args.tilesizey)
         print "vectorisation step has been realized succesfully"
