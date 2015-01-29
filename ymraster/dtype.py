@@ -1,12 +1,24 @@
 # -*- coding: utf-8 -*-
 
-import sys
-import os
-sys.path.append('/usr/lib/otb/python')
-os.environ["ITK_AUTOLOAD_PATH"] = "/usr/lib/otb/applications"
-import otbApplication as otb
-import numpy as np
-from osgeo import gdal
+try:
+    import otbApplication as otb
+except ImportError as e:
+    raise ImportError(
+        str(e)
+        + "\n\nPlease install Orfeo Toolbox if it isn't installed yet.\n\n"
+        "Also, add the otbApplication module path "
+        "(usually something like '/usr/lib/otb/python') "
+        "to the environment variable PYTHONPATH.\n")
+try:
+    from osgeo import gdal
+except ImportError as e:
+    raise ImportError(
+        str(e) + "\n\nPlease install GDAL.")
+try:
+    import numpy as np
+except ImportError as e:
+    raise ImportError(
+        str(e) + "\n\nPlease install NumPy.")
 
 
 class IdDefaultDict(dict):

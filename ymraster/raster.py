@@ -26,21 +26,41 @@ The ``Raster`` class
 The ``Raster`` class define an Image readed from a file.
 """
 
-import sys
-import os
-sys.path.append('/usr/lib/otb/python')
-os.environ["ITK_AUTOLOAD_PATH"] = "/usr/lib/otb/applications"
-import otbApplication
-from osgeo import osr, gdal
-gdal.UseExceptions()
-import numpy as np
+try:
+    import otbApplication
+except ImportError as e:
+    raise ImportError(
+        str(e)
+        + "\n\nPlease install Orfeo Toolbox if it isn't installed yet.\n\n"
+        "Also, add the otbApplication module path "
+        "(usually something like '/usr/lib/otb/python') "
+        "to the PYTHONPATH environment variable.")
+try:
+    app = otbApplication.Registry.CreateApplication('Smoothing')
+    app.SetParameterString('out', 'foo.tif')
+except AttributeError:
+    raise ImportError(
+        "Unable to create otbApplication objects\n\n"
+        "Please set the ITK_AUTOLOAD_PATH environment variable "
+        "to the Orfeo Toolbox applications folder path "
+        "(usually something like '/usr/lib/otb/applications') ")
+try:
+    from osgeo import osr, gdal
+    gdal.UseExceptions()
+except ImportError as e:
+    raise ImportError(
+        str(e) + "\n\nPlease install GDAL.")
+try:
+    import numpy as np
+except ImportError as e:
+    raise ImportError(
+        str(e) + "\n\nPlease install NumPy.")
 import dtype
 import rasterio
 
 from fix_proj_decorator import fix_missing_proj
 
-# TODO: Gérer plus tard les chemins d'accès qui ne sont pas les mêmes pour
-# toutes les machines
+import os
 from tempfile import gettempdir
 
 
