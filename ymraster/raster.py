@@ -26,21 +26,22 @@ The ``Raster`` class
 The ``Raster`` class define an Image readed from a file.
 """
 
+import sys
+import os
+sys.path.append('/usr/lib/otb/python')
+os.environ["ITK_AUTOLOAD_PATH"] = "/usr/lib/otb/applications"
+import otbApplication
 from osgeo import osr, gdal
 gdal.UseExceptions()
 import numpy as np
+import dtype
 import rasterio
 
 from fix_proj_decorator import fix_missing_proj
 
 # TODO: Gérer plus tard les chemins d'accès qui ne sont pas les mêmes pour
 # toutes les machines
-import os
 from tempfile import gettempdir
-import sys
-sys.path.append('/usr/lib/otb/python')
-os.environ["ITK_AUTOLOAD_PATH"] = "/usr/lib/otb/applications"
-import otbApplication
 
 
 def _save_array(array, out_filename, meta):
@@ -103,118 +104,6 @@ def concatenate_images(rasters, out_filename):
     ConcatenateImages.ExecuteAndWriteOutput()
 
 
-class IdDefaultDict(dict):
-    """A dictionary where trying to reach a missing key does create the key with
-    value equal to itself"""
-
-    def __missing__(self, key):
-        self[key] = key
-        return self[key]
-
-
-class DataType(object):
-    """Abstract class for a data type (int16, int32, float32, etc.)"""
-
-    data_type_match = IdDefaultDict()
-
-    def __set__(self, instance, value):
-        instance.otb_dtype = self.data_type_match[value]
-
-    def __get__(self, instance, owner):
-        revert_match = {v: k for k, v in self.data_type_match.iteritems()}
-        return revert_match[instance.otb_dtype]
-
-
-class LStrDataType(DataType):
-    """Represent a data type given in lower string format (eg. 'int16', 'int32',
-    'float32', etc.)"""
-
-    data_type_match = {'uint8': otbApplication.ImagePixelType_uint8,
-                       'uint16': otbApplication.ImagePixelType_uint16,
-                       'uint32': otbApplication.ImagePixelType_uint32,
-                       'int16': otbApplication.ImagePixelType_int16,
-                       'int32': otbApplication.ImagePixelType_int32,
-                       'float32': otbApplication.ImagePixelType_float,
-                       'float64': otbApplication.ImagePixelType_double}
-
-
-class UStrDataType(DataType):
-    """Represent a data type given in upper string format (eg. 'Int16', 'Int32',
-    'Float32', etc.)"""
-
-    data_type_match = {'UInt8': otbApplication.ImagePixelType_uint8,
-                       'UInt16': otbApplication.ImagePixelType_uint16,
-                       'UInt32': otbApplication.ImagePixelType_uint32,
-                       'Int16': otbApplication.ImagePixelType_int16,
-                       'Int32': otbApplication.ImagePixelType_int32,
-                       'Float32': otbApplication.ImagePixelType_float,
-                       'Float64': otbApplication.ImagePixelType_double}
-
-
-class NumpyDataType(DataType):
-    """Represent a data type for Numpy (eg. np.int16, np.int32, np.float32,
-    etc.)"""
-
-    data_type_match = {np.uint8: otbApplication.ImagePixelType_uint8,
-                       np.uint16: otbApplication.ImagePixelType_uint16,
-                       np.uint32: otbApplication.ImagePixelType_uint32,
-                       np.int16: otbApplication.ImagePixelType_int16,
-                       np.int32: otbApplication.ImagePixelType_int32,
-                       np.float32: otbApplication.ImagePixelType_float,
-                       np.float64: otbApplication.ImagePixelType_double}
-
-
-class GdalDataType(DataType):
-    """Represent a data type for gdal (eg. gdal.GDT_Int16, gdal.GDT_Iint32,
-    gdal.GDT_Float32, etc.)"""
-
-    data_type_match = {gdal.GDT_Byte: otbApplication.ImagePixelType_uint8,
-                       gdal.GDT_UInt16: otbApplication.ImagePixelType_uint16,
-                       gdal.GDT_UInt32: otbApplication.ImagePixelType_uint32,
-                       gdal.GDT_Int16: otbApplication.ImagePixelType_int16,
-                       gdal.GDT_Int32: otbApplication.ImagePixelType_int32,
-                       gdal.GDT_Float32: otbApplication.ImagePixelType_float,
-                       gdal.GDT_Float64: otbApplication.ImagePixelType_double}
-
-
-class OtbDataType(DataType):
-    """Represent a data type for orfeo-toolbox
-    (eg. otbApplication.ImagePixelType_int16)"""
-
-    def __set__(self, instance, value):
-        instance._otb_type = value
-
-    def __get__(self, instance, owner):
-        return instance._otb_type
-
-
-class RasterDataType(object):
-    """The usable class to manage raster data types"""
-
-    lstr_dtype = LStrDataType()
-    ustr_dtype = UStrDataType()
-    numpy_dtype = NumpyDataType()
-    gdal_dtype = GdalDataType()
-    otb_dtype = OtbDataType()
-
-    def __init__(self,
-                 lstr_dtype=None,
-                 ustr_dtype=None,
-                 numpy_dtype=None,
-                 otb_dtype=None,
-                 gdal_dtype=None):
-        if lstr_dtype:
-            self.lstr_dtype = lstr_dtype
-        elif ustr_dtype:
-            self.ustr_dtype = ustr_dtype
-        elif numpy_dtype:
-            self.numpy_dtype = numpy_dtype
-        elif gdal_dtype:
-            self.gdal_dtype = gdal_dtype
-        elif otb_dtype:
-            self.otb_dtype = otb_dtype
-
-
 class Raster():
     """Represents a raster image that was read from a file
 
@@ -241,7 +130,7 @@ class Raster():
         self.meta['count'] = ds.RasterCount             # int
         self.meta['width'] = ds.RasterXSize             # int
         self.meta['height'] = ds.RasterYSize            # int
-        self.meta['dtype'] = RasterDataType(
+        self.meta['dtype'] = dtype.RasterDataType(
             gdal_dtype=ds.GetRasterBand(1).DataType)    # RasterDataType object
         self.meta['transform'] = ds.GetGeoTransform()   # tuple
 
