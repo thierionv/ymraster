@@ -27,7 +27,7 @@ The ``Raster`` class define an Image readed from a file.
 """
 
 try:
-    import otbApplication
+    import otbApplication as otb
 except ImportError as e:
     raise ImportError(
         str(e)
@@ -36,7 +36,7 @@ except ImportError as e:
         "(usually something like '/usr/lib/otb/python') "
         "to the PYTHONPATH environment variable.")
 try:
-    app = otbApplication.Registry.CreateApplication('Smoothing')
+    app = otb.Registry.CreateApplication('Smoothing')
     app.SetParameterString('out', 'foo.tif')
 except AttributeError:
     raise ImportError(
@@ -115,8 +115,7 @@ def concatenate_images(rasters, out_filename):
 
     # Perform the concatenation
     filenames = [raster.filename for raster in rasters]
-    ConcatenateImages = otbApplication.Registry.CreateApplication(
-        "ConcatenateImages")
+    ConcatenateImages = otb.Registry.CreateApplication("ConcatenateImages")
     ConcatenateImages.SetParameterStringList("il", filenames)
     ConcatenateImages.SetParameterString("out", out_filename)
     if same_type:
@@ -196,7 +195,7 @@ class Raster():
         :param out_filename: path to the output file
         """
         # Split the N-bands image into N mono-band images (in temp folder)
-        SplitImage = otbApplication.Registry.CreateApplication("SplitImage")
+        SplitImage = otb.Registry.CreateApplication("SplitImage")
         SplitImage.SetParameterString("in", self.filename)
         SplitImage.SetParameterString("out", os.path.join(gettempdir(),
                                                           'splitted.tif'))
@@ -209,8 +208,7 @@ class Raster():
         list_path = [os.path.join(gettempdir(), 'splitted_{}.tif'.format(i))
                      for i in range(self.meta['count'])
                      if i + 1 != idx]
-        ConcatenateImages = otbApplication.Registry.CreateApplication(
-            "ConcatenateImages")
+        ConcatenateImages = otb.Registry.CreateApplication("ConcatenateImages")
         ConcatenateImages.SetParameterStringList("il", list_path)
         ConcatenateImages.SetParameterString("out", out_filename)
         ConcatenateImages.SetParameterOutputImagePixelType(
@@ -238,8 +236,7 @@ class Raster():
                 and pan.meta['srs'] is None), \
             "Images have not the same Coordinate Reference System : "
         "'{}' and '{}'".format(self.filename, pan.filename)
-        Pansharpening = otbApplication.Registry.CreateApplication(
-            "BundleToPerfectSensor")
+        Pansharpening = otb.Registry.CreateApplication("BundleToPerfectSensor")
         Pansharpening.SetParameterString("inp", pan.filename)
         Pansharpening.SetParameterString("inxs", self.filename)
         Pansharpening.SetParameterString("out", output_image)
@@ -257,7 +254,7 @@ class Raster():
         :param idx_red: index of the red band
         :param idx_nir: index of the near infrared band
         """
-        RadiometricIndices = otbApplication.Registry.CreateApplication(
+        RadiometricIndices = otb.Registry.CreateApplication(
             "RadiometricIndices")
         RadiometricIndices.SetParameterString("in", self.filename)
         RadiometricIndices.SetParameterInt("channels.red", idx_red)
@@ -277,7 +274,7 @@ class Raster():
         :param idx_nir: index of the near infrared band
         :param idx_mir: index of the middle infrared band
         """
-        RadiometricIndices = otbApplication.Registry.CreateApplication(
+        RadiometricIndices = otb.Registry.CreateApplication(
             "RadiometricIndices")
         RadiometricIndices.SetParameterString("in", self.filename)
         RadiometricIndices.SetParameterInt("channels.nir", idx_nir)
@@ -299,7 +296,7 @@ class Raster():
         :param idx_green: index of the green band
         :param idx_mir: index of the middle infrared band
         """
-        RadiometricIndices = otbApplication.Registry.CreateApplication(
+        RadiometricIndices = otb.Registry.CreateApplication(
             "RadiometricIndices")
         RadiometricIndices.SetParameterString("in", self.filename)
         RadiometricIndices.SetParameterInt("channels.green", idx_green)
@@ -326,8 +323,8 @@ class Raster():
         return Raster(output_image)
 
     def lsms_smoothing(self, output_filtered_image, spatialr, ranger,
-                      output_spatial_image, thres = 0.1, rangeramp = 0,
-                      maxiter = 10, modesearch = 0):
+                       output_spatial_image, thres=0.1, rangeramp=0,
+                       maxiter=10, modesearch=0):
         """First step of LSMS : perform a mean shift fitlering, using
         the MeanShiftSmoothing otb application. It returns two raster instances
         corresponding to the filtered image and the spatial image
@@ -347,7 +344,7 @@ class Raster():
         y = rangeramp*x+ranger.
         """
 
-        MeanShiftSmoothing = otbApplication.Registry.CreateApplication(
+        MeanShiftSmoothing = otb.Registry.CreateApplication(
             "MeanShiftSmoothing")
         MeanShiftSmoothing.SetParameterString("in", self.filename)
         MeanShiftSmoothing.SetParameterString("fout", output_filtered_image)
@@ -362,8 +359,8 @@ class Raster():
 
         return Raster(output_filtered_image), Raster(output_spatial_image)
 
-    def lsms_segmentation(self, input_pos_img, output_seg_image, spatialr, ranger,
-                 tilesizex=256, tilesizey=256):
+    def lsms_segmentation(self, input_pos_img, output_seg_image, spatialr,
+                          ranger, tilesizex=256, tilesizey=256):
         """Second step of LSMS : produce a labeled image with different clusters,
         according to the range and spatial proximity of the pixels, using the
         LSMSSegmentation otb application. It returns a raster instance of the
@@ -379,8 +376,7 @@ class Raster():
         :param tilesizex : Int, Size of tiles along the X-axis, by default 256
         :param tilesizey : Int, Size of tiles along the Y-axis, by default 256
         """
-        LSMSSegmentation = otbApplication.Registry.CreateApplication(
-            "LSMSSegmentation")
+        LSMSSegmentation = otb.Registry.CreateApplication("LSMSSegmentation")
         LSMSSegmentation.SetParameterString("in", self.filename)
         LSMSSegmentation.SetParameterString("inpos", input_pos_img.filename)
         LSMSSegmentation.SetParameterString("out", output_seg_image)
@@ -411,20 +407,14 @@ class Raster():
         :param tilesizey : Int, Size of tiles along the Y-axis, by default 256
         """
 
-        # The following line creates an instance of the LSMSSmallRegionsMerging
-        # application
-        LSMSSmallRegionsMerging = otbApplication.Registry.CreateApplication(
+        LSMSSmallRegionsMerging = otb.Registry.CreateApplication(
             "LSMSSmallRegionsMerging")
-
-        # The following lines set all the application parameters:
         LSMSSmallRegionsMerging.SetParameterString("in", in_smooth.filename)
         LSMSSmallRegionsMerging.SetParameterString("inseg", self.filename)
         LSMSSmallRegionsMerging.SetParameterString("out", output_merged)
         LSMSSmallRegionsMerging.SetParameterInt("minsize", minsize)
         LSMSSmallRegionsMerging.SetParameterInt("tilesizex", tilesizex)
         LSMSSmallRegionsMerging.SetParameterInt("tilesizey", tilesizey)
-
-        # The following line execute the application
         LSMSSmallRegionsMerging.ExecuteAndWriteOutput()
 
         return Raster(output_merged)
@@ -441,19 +431,13 @@ class Raster():
         :param tilesizex : Int, Size of tiles along the X-axis, by default 256
         :param tilesizey : Int, Size of tiles along the Y-axis, by default 256
         """
-        # The following line creates an instance of the LSMSVectorization
-        # application
-        LSMSVectorization = otbApplication.Registry.CreateApplication(
+        LSMSVectorization = otb.Registry.CreateApplication(
             "LSMSVectorization")
-
-        # The following lines set all the application parameters:
         LSMSVectorization.SetParameterString("in", in_image.filename)
         LSMSVectorization.SetParameterString("inseg", self.filename)
         LSMSVectorization.SetParameterString("out", output_vector)
         LSMSVectorization.SetParameterInt("tilesizex", tilesizex)
         LSMSVectorization.SetParameterInt("tilesizey", tilesizey)
-
-        # The following line execute the application
         LSMSVectorization.ExecuteAndWriteOutput()
 
     def lsms(self, spatialr, ranger, maxiter, thres, rangeramp,
