@@ -145,13 +145,14 @@ class Raster():
         # Read information from image
         ds = gdal.Open(self.filename, gdal.GA_ReadOnly)
         self.meta = {}
-        self.meta['driver'] = ds.GetDriver()            # gdal.Driver object
-        self.meta['count'] = ds.RasterCount             # int
-        self.meta['width'] = ds.RasterXSize             # int
-        self.meta['height'] = ds.RasterYSize            # int
-        self.meta['dtype'] = dtype.RasterDataType(
-            gdal_dtype=ds.GetRasterBand(1).DataType)    # RasterDataType object
-        self.meta['transform'] = ds.GetGeoTransform()   # tuple
+        self.meta['driver'] = ds.GetDriver()          # gdal.Driver object
+        self.meta['count'] = ds.RasterCount           # int
+        self.meta['width'] = ds.RasterXSize           # int
+        self.meta['height'] = ds.RasterYSize          # int
+        self.meta['dtype'] = dtype.RasterDataType(    # RasterDataType object
+            gdal_dtype=ds.GetRasterBand(1).DataType)
+        self.meta['transform'] = ds.GetGeoTransform(  # tuple
+            can_return_null=True)
 
         # Read spatial reference as a osr.SpatialReference object or None
         # if there is no srs in metadata
