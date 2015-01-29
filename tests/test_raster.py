@@ -334,10 +334,11 @@ class TestOtbFunctions(unittest.TestCase):
 
         # Compute and check second step (segmentation)
         out_file_segmented = tempfile.NamedTemporaryFile(suffix='.tif')
-        segmented = filtered.lsms_seg(input_pos_img=spatial,
-                                      output_seg_image=out_file_segmented.name,
-                                      spatialr=5,
-                                      ranger=15)
+        segmented = filtered.lsms_segmentation(
+            input_pos_img=spatial,
+            output_seg_image=out_file_segmented.name,
+            spatialr=5,
+            ranger=15)
         _check_output_image(tester=self,
                             filename=out_file_segmented.name,
                             driver=u'GTiff',
@@ -366,7 +367,7 @@ class TestOtbFunctions(unittest.TestCase):
         # number of labels and projections
         out_segmented_merged_shp_filename = os.path.join(tempfile.gettempdir(),
                                                          'segmented_merged.shp')
-        segmented_merged.lsms_vectorisation(
+        segmented_merged.lsms_vectorization(
             in_image=self.raster,
             output_vector=out_segmented_merged_shp_filename)
 
