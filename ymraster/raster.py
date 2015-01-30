@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
 """
-A Raster manipulation library
-=============================
+Yet one More Raster library
+===========================
 
 The ``ymraster`` module contains classes for manipulating raster images.
 
@@ -21,6 +21,13 @@ The ``Raster`` class
 A ``Raster`` instance represents a raster read from a file.
 
 >>> raster = Raster('tests/data/RGB.byte.tif')
+
+It has some attributes:
+
+>>> raster.filename
+'tests/data/RGB.byte.tif'
+>>> raster.meta['width']
+791
 
 
 Module reference
@@ -66,7 +73,7 @@ from tempfile import gettempdir
 
 
 def _save_array(array, out_filename, meta):
-    """Write an NumPy array to an image file
+    """Write an NumPy array to an image file.
 
     :param array: the NumPy array to save
     :param out_filename: path to the file to write in
@@ -86,7 +93,7 @@ def _save_array(array, out_filename, meta):
 
 
 def concatenate_images(rasters, out_filename):
-    """Write a raster which is the concatenation of the given rasters, in order
+    """Write a raster which is the concatenation of the given rasters, in order.
 
     All bands in all input rasters must have same size.
 
@@ -127,7 +134,7 @@ def concatenate_images(rasters, out_filename):
 
 
 class Raster():
-    """Represents a raster image that was read from a file
+    """Represents a raster image that was read from a file.
 
     The whole raster *is not* loaded into memory. Instead this class records
     useful information about the raster (number and size of bands, projection,
@@ -137,8 +144,8 @@ class Raster():
     """
 
     def __init__(self, filename):
-        """Create a new raster object read from a filename, and compute
-        useful properties
+        """Create a new raster object read from a file, and compute useful
+        properties.
 
         :param filename: a string containing the path of the image to read
         :param bands: band names (eg. 'blue', 'red', 'infrared, etc.)
@@ -167,7 +174,7 @@ class Raster():
         ds = None
 
     def array(self):
-        """Return a NumPy array corresponding to the raster
+        """Returns the NumPy array corresponding to the raster.
 
         :rtype: numpy.ndarray"""
         # Initialize an empty array of correct size and type
@@ -184,7 +191,7 @@ class Raster():
         return array
 
     def set_projection(self, srs):
-        """Write the given projection into the raster's metadata
+        """Writes the given projection into the raster's metadata.
 
         :param srs: projection to set
         :type srs: osgeo.osr.SpatialReference
@@ -195,15 +202,15 @@ class Raster():
         self.meta['srs'] = srs
 
     def remove_band(self, idx, out_filename):
-        """Write a new raster (in the specified output file) which is the same
-        than the current raster, except that the band at the given index is
-        removed, and return the corresponding ``Raster`` object.
+        """Writes a new raster (in the specified output file) which is the same
+        than the current raster, except that the band at the given index has
+        been remove.
 
         :param idx: index of the band to remove (starts at 1)
         :type idx: int
         :param out_filename: path to the output file
         :type out_filename: str
-        :rtype: ``Raster``
+        :returns: the ``Raster`` instance corresponding to the output file
         """
         # Split the N-bands image into N mono-band images (in temp folder)
         SplitImage = otb.Registry.CreateApplication("SplitImage")
@@ -234,15 +241,14 @@ class Raster():
         return Raster(out_filename)
 
     def fusion(self, pan, out_filename):
-        """Sharpen the raster with a more detailed panchromatic image, save the
-        result into the specified output file, and return the corresponding
-        ``Raster`` object
+        """Sharpen the raster with a more detailed panchromatic image, and save
+        the result into the specified output file.
 
         :param pan: panchromatic image to use for sharpening
         :type pan: ``Raster``
         :param out_filename: path to the output file
         :type out_filename: str
-        :rtpye: ``Raster``
+        :returns: the ``Raster`` instance corresponding to the output file
         """
         assert (self.meta['srs'] is not None
                 and pan.meta['srs'] is not None
@@ -262,9 +268,8 @@ class Raster():
 
     @fix_missing_proj
     def ndvi(self, out_filename, idx_red, idx_nir):
-        """Write the Normalized Difference Vegetation Index (NDVI) of the raster
-        into the specified output file and return the corresponding Raster
-        object.
+        """Writes the Normalized Difference Vegetation Index (NDVI) of the
+        raster into the specified output file.
 
         :param out_filename: path to the output file
         :type out_filename: str
@@ -272,6 +277,7 @@ class Raster():
         :type idx_red: int
         :param idx_nir: index of a near-infrared band (starts at 1)
         :type idx_nir: int
+        :returns: the ``Raster`` instance corresponding to the output file
         """
         RadiometricIndices = otb.Registry.CreateApplication(
             "RadiometricIndices")
@@ -286,12 +292,16 @@ class Raster():
 
     @fix_missing_proj
     def ndwi(self, out_filename, idx_nir, idx_mir):
-        """Write the NDWI of the image into the given output file and
-        return the corresponding Raster object. Indexation starts at 1.
+        """Writes the Normalized Difference Vegetation Index (NDWI) of the
+        raster into the given output file.
 
         :param out_filename: path to the output file
-        :param idx_nir: index of the near infrared band
-        :param idx_mir: index of the middle infrared band
+        :type out_filename: str
+        :param idx_nir: index of the near infrared band (starts at 1)
+        :type idx_nir: int
+        :param idx_mir: index of the middle infrared band (starts at 1)
+        :type idx_mir: int
+        :returns: the ``Raster`` instance corresponding to the output file
         """
         RadiometricIndices = otb.Registry.CreateApplication(
             "RadiometricIndices")
@@ -308,12 +318,16 @@ class Raster():
 
     @fix_missing_proj
     def mndwi(self, out_filename, idx_green, idx_mir):
-        """Write the MNDWI of the image into the given output file and
-        return the corresponding Raster object. Indexation starts at 1.
+        """Writes the Modified Normalized Difference Water Index (MNDWI) of the
+        image into the given output file.
 
         :param out_filename: path to the output file
+        :type out_filename: str
         :param idx_green: index of the green band
+        :type idx_green: int
         :param idx_mir: index of the middle infrared band
+        :type idx_mir: int
+        :returns: the ``Raster`` instance corresponding to the output file
         """
         RadiometricIndices = otb.Registry.CreateApplication(
             "RadiometricIndices")
@@ -329,48 +343,59 @@ class Raster():
     ndsi = mndwi
 
     def concatenate(self, rasters, out_filename):
-        """Append into the specifed output file:
-            * the current raster, *and*
-            * a list of rasters of the same size
-        and return the corresponding ``Raster`` object.
+        """Concatenates into the specifed output file:
+            * the current raster, *and*,
+            * a list of rasters of the same size.
 
         :param rasters: a list of rasters to append after the current raster
         :type rasters: list of ``Raster``
         :param out_filename: path to the output file
         :type out_filename: str
-        :rtype: ``Raster``
+        :returns: the ``Raster`` instance corresponding to the output file
         """
         list_ = [self] + rasters
         concatenate_images(list_, out_filename)
         return Raster(out_filename)
 
-    def lsms_smoothing(self, output_filtered_image, spatialr, ranger,
-                       output_spatial_image, thres=0.1, rangeramp=0,
+    def lsms_smoothing(self, out_smoothed_filename, spatialr, ranger,
+                       out_spatial_filename, thres=0.1, rangeramp=0,
                        maxiter=10, modesearch=0):
-        """First step of LSMS : perform a mean shift fitlering, using
-        the MeanShiftSmoothing otb application. It returns two raster instances
-        corresponding to the filtered image and the spatial image
+        """First step of a Large-Scale Mean-Shift (LSMS) segmentation: performs
+        a mean shift smoothing on the raster.
 
-        :param output_filtered_image : path and name of the output image
-        filtered to be written
-        :param output_spatial_image : path and name of the output spatial image
-        to be written
-        :param spatialr : Int, Spatial radius of the neighborhooh
-        :param ranger: Float, Range radius defining the radius (expressed in
-        radiometry unit) in the multi-spectral space.
-        :param maxiter : Int, Maximum number of iterations of the algorithm
-        used in MeanSiftSmoothing application
-        :param thres : Float, Mean shift vector threshold
-        :param rangeramp : Float, Range radius coefficient: This coefficient
-        makes dependent the ranger of the colorimetry of the filtered pixel :
-        y = rangeramp*x+ranger.
+        This is an adapted version of the Orfeo Toolbox ``MeanShiftSmoothing``
+        application. See
+        http://www.orfeo-toolbox.org/CookBook/CookBooksu91.html#x122-5480005.5.2
+        for more details
+
+        :param out_smoothed_filename: path to the smoothed file to be written
+        :type out_smoothed_filename: str
+        :param out_spatial_filename: path to the spatial image to be written
+        :type out_spatial_filename: str
+        :param spatialr: spatial radius of the window
+        :type spatialr: int
+        :param ranger: range radius defining the spectral window size (expressed
+                       in radiometry unit)
+        :type ranger: float
+        :param maxiter: maximum number of iterations in case of non-convergence
+        :type maxiter: int
+        :param thres: mean shift vector threshold
+        :type thres: float
+        :param rangeramp: range radius coefficient. This coefficient makes
+                          dependent the ``ranger`` of the colorimetry of the
+                          filtered pixel:
+                              .. math::
+                                  y = rangeramp * x + ranger.
+        :type rangeramp: float
+        :returns: two ``Raster`` instances corresponding to the filtered image
+        and the spatial image
+        :rtype: tuple of ``Raster``
         """
-
         MeanShiftSmoothing = otb.Registry.CreateApplication(
             "MeanShiftSmoothing")
         MeanShiftSmoothing.SetParameterString("in", self.filename)
-        MeanShiftSmoothing.SetParameterString("fout", output_filtered_image)
-        MeanShiftSmoothing.SetParameterString("foutpos", output_spatial_image)
+        MeanShiftSmoothing.SetParameterString("fout", out_smoothed_filename)
+        MeanShiftSmoothing.SetParameterString("foutpos", out_spatial_filename)
         MeanShiftSmoothing.SetParameterInt("spatialr", spatialr)
         MeanShiftSmoothing.SetParameterFloat("ranger", ranger)
         MeanShiftSmoothing.SetParameterFloat("thres", thres)
@@ -379,29 +404,47 @@ class Raster():
         MeanShiftSmoothing.SetParameterInt("modesearch", modesearch)
         MeanShiftSmoothing.ExecuteAndWriteOutput()
 
-        return Raster(output_filtered_image), Raster(output_spatial_image)
+        return Raster(out_smoothed_filename), Raster(out_spatial_filename)
 
-    def lsms_segmentation(self, input_pos_img, output_seg_image, spatialr,
+    def lsms_segmentation(self, in_spatial_raster, out_filename, spatialr,
                           ranger, tilesizex=256, tilesizey=256):
-        """Second step of LSMS : produce a labeled image with different clusters,
-        according to the range and spatial proximity of the pixels, using the
-        LSMSSegmentation otb application. It returns a raster instance of the
-        segmented image.
+        """Second step in a LSMS segmentation: performs the actual object
+        segmentation on the raster. Produce an image whose pixels are given a
+        label number, based on their spectral and spatial proximity.
 
-        :param input_pos_img : Raster instance of a spatial image, which may
-        have been created in the smoothing step
-        :param output_seg_image : path and name of the output segmented image
-        to be written
-        :param spatialr : Int, Spatial radius of the neighborhooh
-        :param ranger: Float, Range radius defining the radius (expressed in
-        radiometry unit) in the multi-spectral space.
-        :param tilesizex : Int, Size of tiles along the X-axis, by default 256
-        :param tilesizey : Int, Size of tiles along the Y-axis, by default 256
+        This assumes that the ``Raster`` object is smoothed, for example as
+        returned by the ``lsms_smoothing`` method.
+
+        To consume less memory resources, the method tiles the raster and
+        performs the segmentation on each tile.
+
+        This is an adapted version of the Orfeo Toolbox ``LSMSSegmentation``
+        application where there is no option to set a ``minsize`` parameter to
+        discard small objects. See
+        http://www.orfeo-toolbox.org/CookBook/CookBooksu121.html#x156-8990005.9.3
+        for more details
+
+        :param in_spatial_raster: a spatial raster associated to this raster
+                                  (for example, as returned by the
+                                  ``lsms_smoothing`` method)
+        :type in_spatial_raster: ``Raster``
+        :param out_filename: path to the segmented image to be written
+        :param spatialr: spatial radius of the window
+        :type spatialr: int
+        :param ranger: range radius defining the spectral window size (expressed
+                       in radiometry unit)
+        :type ranger: float
+        :param tilesizex: width of each tile (default: 256)
+        :type tilesizex: int
+        :param tilesizey: height of each tile (default: 256)
+        :type tilesizey: int
+        :returns: ``Raster`` instance corresponding to the segmented image
         """
         LSMSSegmentation = otb.Registry.CreateApplication("LSMSSegmentation")
         LSMSSegmentation.SetParameterString("in", self.filename)
-        LSMSSegmentation.SetParameterString("inpos", input_pos_img.filename)
-        LSMSSegmentation.SetParameterString("out", output_seg_image)
+        LSMSSegmentation.SetParameterString("inpos",
+                                            in_spatial_raster.filename)
+        LSMSSegmentation.SetParameterString("out", out_filename)
         LSMSSegmentation.SetParameterFloat("ranger", ranger)
         LSMSSegmentation.SetParameterFloat("spatialr", spatialr)
         LSMSSegmentation.SetParameterInt("minsize", 0)
@@ -409,54 +452,92 @@ class Raster():
         LSMSSegmentation.SetParameterInt("tilesizey", tilesizey)
         LSMSSegmentation.ExecuteAndWriteOutput()
 
-        return Raster(output_seg_image)
+        return Raster(out_filename)
 
     @fix_missing_proj
-    def lsms_merging(self, in_smooth, output_merged, minsize, tilesizex=256,
-                     tilesizey=256):
-        """Third step LSMS :  merge regions whose size in pixels is lower
-        than minsize parameter with the adjacent regions with the adjacent
-        region with closest radiometry and acceptable size, using the
-        LSMSSmallRegionsMerging otb application. It returns a Raster instance
-        of the merged image.
+    def lsms_merging(self, in_smoothed_raster, out_filename, minsize,
+                     tilesizex=256, tilesizey=256):
+        """Optional third step in a LSMS segmentation:  merge objects in the
+        raster whose size in pixels is lower than a given threshold into the
+        bigger enough adjacent object with closest radiometry (radiometry is
+        given by the original image from which the labeled raster was computed).
 
-        :param in_smooth: smoothed image from the step 1
-        :param output_merged: path and name of the output merged segmented
-                              image to be written
-        :param minsize: Int, minimum size of a label
-        :param tilesizex: Int, Size of tiles along the X-axis, by default 256
-        :param tilesizey: Int, Size of tiles along the Y-axis, by default 256
+        This assumes that the ``Raster`` object is a segmented and labeled
+        image, for example as returned by the ``lsms_segmentation`` method.
+
+        To consume less memory resources, the method tiles the raster and
+        performs the segmentation on each tile.
+
+        This is an adapted version of the Orfeo Toolbox
+        ``LSMSSmallRegionsMerging`` application. See
+        http://www.orfeo-toolbox.org/CookBook/CookBooksu122.html#x157-9060005.9.4
+        for more details.
+
+        the LSMSSmallRegionsMerging otb application. It returns a Raster
+        instance of the merged image.
+
+        :param in_smoothed_raster: smoothed raster associated to this raster
+                                   (for example, as returned by the
+                                   ``lsms_smoothing`` method)
+        :type in_smoothed_raster: ``Raster``
+        :param out_filename: path to the merged segmented image to be written
+        :type out_filename: str
+        :param minsize: threshold defining the minimum size of an object
+        :type minsize: int
+        :param tilesizex: width of each tile (default: 256)
+        :type tilesizex: int
+        :param tilesizey: height of each tile (default: 256)
+        :type tilesizey: int
+        :returns: ``Raster`` instance corresponding to the merged segmented
+                  image
         """
-
         LSMSSmallRegionsMerging = otb.Registry.CreateApplication(
             "LSMSSmallRegionsMerging")
-        LSMSSmallRegionsMerging.SetParameterString("in", in_smooth.filename)
+        LSMSSmallRegionsMerging.SetParameterString("in",
+                                                   in_smoothed_raster.filename)
         LSMSSmallRegionsMerging.SetParameterString("inseg", self.filename)
-        LSMSSmallRegionsMerging.SetParameterString("out", output_merged)
+        LSMSSmallRegionsMerging.SetParameterString("out", out_filename)
         LSMSSmallRegionsMerging.SetParameterInt("minsize", minsize)
         LSMSSmallRegionsMerging.SetParameterInt("tilesizex", tilesizex)
         LSMSSmallRegionsMerging.SetParameterInt("tilesizey", tilesizey)
         LSMSSmallRegionsMerging.ExecuteAndWriteOutput()
 
-        return Raster(output_merged)
+        return Raster(out_filename)
 
-    def lsms_vectorization(self, in_image, output_vector, tilesizex=256,
+    def lsms_vectorization(self, orig_raster, out_filename, tilesizex=256,
                            tilesizey=256):
-        """Final step of LSMS : convert a label image to a GIS vector file
-        containing one polygon per segment, using the LSMSVectorization otb
-        application.
+        """Last step in a LSMS segmentation: vectorize a labeled segmented
+        image, turn each object into a polygon. Each polygon will have some
+        attribute data:
+            * the label number as an attribute,
+            * the object's mean for each band in the original image,
+            * the object's standard deviation for each band in the original
+              image,
+            * number of pixels in the object.
 
-        :param in_image : Raster instance of the image
-        :param output_vector : path and name of the output vector file ( ex:
-        "vector.shp") to be written
-        :param tilesizex : Int, Size of tiles along the X-axis, by default 256
-        :param tilesizey : Int, Size of tiles along the Y-axis, by default 256
+        This assumes that the ``Raster`` object is a segmented and labeled
+        image, for example as returned by the ``lsms_segmentation`` or the
+        ``lsms_merging`` methods.
+
+        To consume less memory resources, the method tiles the raster and
+        performs the segmentation on each tile.
+
+        to a vector file containing one polygon per segment, using the
+        LSMSVectorization otb application.
+
+        :param orig_raster: original raster from which the segmentation was
+                             computed
+        :param out_filename: path to the output vector file
+        :param tilesizex: width of each tile (default: 256)
+        :type tilesizex: int
+        :param tilesizey: height of each tile (default: 256)
+        :type tilesizey: int
         """
         LSMSVectorization = otb.Registry.CreateApplication(
             "LSMSVectorization")
-        LSMSVectorization.SetParameterString("in", in_image.filename)
+        LSMSVectorization.SetParameterString("in", orig_raster.filename)
         LSMSVectorization.SetParameterString("inseg", self.filename)
-        LSMSVectorization.SetParameterString("out", output_vector)
+        LSMSVectorization.SetParameterString("out", out_filename)
         LSMSVectorization.SetParameterInt("tilesizex", tilesizex)
         LSMSVectorization.SetParameterInt("tilesizey", tilesizey)
         LSMSVectorization.ExecuteAndWriteOutput()
@@ -464,33 +545,6 @@ class Raster():
     def lsms(self, spatialr, ranger, maxiter, thres, rangeramp,
              output_filtered_image, output_spatial_image, output_seg_image,
              output_merged, minsize, output_vector, m_step=True):
-        """Perform a segmentation on Raster instance given. It proceeds in 4
-        steps in row : smoothing, segmentation, merging of small region and
-        vectorisation.
-
-        :param output_filtered_image : path and name of the output image
-        filtered to be written
-        :param output_spatial_image : path and name of the output spatial image
-        to be written
-        :param spatialr : Int, Spatial radius of the neighborhooh
-        :param ranger: Float, Range radius defining the radius (expressed in
-        radiometry unit) in the multi-spectral space.
-        :param maxiter : Int, Maximum number of iterations of the algorithm
-        used in MeanSiftSmoothing application
-        :param thres : Float, Mode convergence threshold #TOCOMPLETE
-        :param rangeramp : Float, Range radius coefficient: This coefficient
-        makes dependent the ranger of the colorimetry of the filtered pixel :
-        y = rangeramp*x+ranger.
-        :param output_seg_image : path and name of the output segmented image
-        to be written
-        :param output_merged : path and name of the output merged segmented
-        image to be written
-        :param minsize : Int, minimum size of a label
-        :param output_vector : path and name of the output vector file ( ex:
-        "vector.shp") to be written
-        :param m_step : Boolean, indicates if the merging step has to be done
-        """
-
         img_smoothed, img_pos = self.lsms_smoothing(output_filtered_image,
                                                     spatialr,
                                                     ranger,

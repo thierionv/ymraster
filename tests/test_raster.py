@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import unittest
+import doctest
 import tempfile
 
 from ymraster import _save_array, concatenate_images, Raster
@@ -351,18 +352,18 @@ class TestOtbFunctions(unittest.TestCase):
 
     def test_lsms_segmentation_should_compute_segmented_image(self):
         # Compute and check first step (smoothing)
-        out_file_filtered = tempfile.NamedTemporaryFile(suffix='.tif')
+        out_file_smoothed = tempfile.NamedTemporaryFile(suffix='.tif')
         out_file_spatial = tempfile.NamedTemporaryFile(suffix='.tif')
         filtered, spatial = self.raster.lsms_smoothing(
-            output_filtered_image=out_file_filtered.name,
+            out_smoothed_filename=out_file_smoothed.name,
             spatialr=5,
             ranger=15,
             maxiter=5,
             thres=0.1,
             rangeramp=0,
-            output_spatial_image=out_file_spatial.name)
+            out_spatial_filename=out_file_spatial.name)
         _check_output_image(tester=self,
-                            filename=out_file_filtered.name,
+                            filename=out_file_smoothed.name,
                             driver=u'GTiff',
                             width=self.raster.meta['width'],
                             height=self.raster.meta['height'],
@@ -381,8 +382,8 @@ class TestOtbFunctions(unittest.TestCase):
         # Compute and check second step (segmentation)
         out_file_segmented = tempfile.NamedTemporaryFile(suffix='.tif')
         segmented = filtered.lsms_segmentation(
-            input_pos_img=spatial,
-            output_seg_image=out_file_segmented.name,
+            in_spatial_raster=spatial,
+            out_filename=out_file_segmented.name,
             spatialr=5,
             ranger=15)
         _check_output_image(tester=self,
@@ -397,8 +398,8 @@ class TestOtbFunctions(unittest.TestCase):
         # Compute and check third step (merging)
         out_file_segmented_merged = tempfile.NamedTemporaryFile(suffix='.tif')
         segmented_merged = segmented.lsms_merging(
-            in_smooth=filtered,
-            output_merged=out_file_segmented_merged.name,
+            in_smoothed_raster=filtered,
+            out_filename=out_file_segmented_merged.name,
             minsize=10)
         _check_output_image(tester=self,
                             filename=out_file_segmented_merged.name,
@@ -414,8 +415,8 @@ class TestOtbFunctions(unittest.TestCase):
         out_segmented_merged_shp_filename = os.path.join(tempfile.gettempdir(),
                                                          'segmented_merged.shp')
         segmented_merged.lsms_vectorization(
-            in_image=self.raster,
-            output_vector=out_segmented_merged_shp_filename)
+            orig_raster=self.raster,
+            out_filename=out_segmented_merged_shp_filename)
 
         ds = gdal.Open(segmented_merged.filename, gdal.GA_ReadOnly)
         band = ds.GetRasterBand(1)
@@ -436,12 +437,17 @@ class TestOtbFunctions(unittest.TestCase):
             os.remove(os.path.join(tmpdir, filename))
 
 
-def suite():
+def unit_suite():
     suite = unittest.TestSuite()
     load_from = unittest.defaultTestLoader.loadTestsFromTestCase
     suite.addTests(load_from(TestRaster))
     return suite
 
 
+def doc_suite():
+    return doctest.DocTestSuite()
+
+
 if __name__ == '__main__':
-    unittest.TextTestRunner(verbosity=2).run(suite())
+    unittest.TextTestRunner(verbosity=2).run(unit_suite())
+    unittest.TextTestRunner(verbosity=2).run(doc_suite())
