@@ -28,6 +28,10 @@ You need to have the following tools installed and properly set up:
 * `rasterio <https://github.com/mapbox/rasterio>`_ for reading and saving
   rasters efficiently.
 
+The first three are most certainly packaged in your Linux distribution. For the last one use pip.::
+
+        pip install --user rasterio
+
 Note that you have to set some environment variables in order for OTB to work.
 Add the following lines to your ``.bashrc`` or adapt them to your environment::
 
@@ -46,8 +50,9 @@ Simple clone the repository in a folder of your choice::
 Then create a .pth file in your ``site-packages`` folder with the path to the folder.::
 
         cd /.local/lib/python2.7/site-pakcages  # create directory if it does not exists
-        echo "~/.local/opt/ymraster" > ymraster.pyh
+        echo "/home/<user>/local/opt/ymraster" > ymraster.pyh
 
 Now you can import ``ymraster`` in Python.
 
 >>> import ymraster
+>>>
