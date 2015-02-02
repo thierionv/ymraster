@@ -23,13 +23,12 @@ You need to have the following tools installed and properly set up:
 * `GDAL <http://gdal.org/>`_ for reading and writing rasters,
 * `NumPy <http://www.numpy.org/>`_ for matrix & numeric computations,
 
-The first three are most certainly packaged in your Linux distribution. For the
-last one use pip.::
-
-        pip install --user rasterio
+Surely, there are already binary packages for these tools for your Linux
+distribution.
 
 Note that you have to set some environment variables in order for OTB to work.
-Add the following lines to your ``.bashrc`` or adapt them to your environment::
+Add the following lines to your ``~/.bashrc`` and adapt them to your
+environment::
 
         export PYTHONPATH=${PYTHONPATH}${PYTHONPATH:+:}/usr/lib/otb/pyhon
         export ITK_AUTOLOAD_PATH=/usr/lib/otb/applications
