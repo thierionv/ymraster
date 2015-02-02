@@ -30,7 +30,7 @@ Note that you have to set some environment variables in order for OTB to work.
 Add the following lines to your ``~/.bashrc`` and adapt them to your
 environment::
 
-        export PYTHONPATH=${PYTHONPATH}${PYTHONPATH:+:}/usr/lib/otb/pyhon
+        export PYTHONPATH=${PYTHONPATH}${PYTHONPATH:+:}/usr/lib/otb/python
         export ITK_AUTOLOAD_PATH=/usr/lib/otb/applications
 
 
@@ -39,14 +39,14 @@ Installation
 
 Simple clone the repository in a folder of your choice::
 
-        cd </path/to/folder>  # eg. ~/.local/opt
-        git clone https://github.com/ygversil/ymraster.git
+        $ cd </path/to/folder>  # eg. ~/.local/opt
+        $ git clone https://github.com/ygversil/ymraster.git
 
 Then create a .pth file in your ``site-packages`` folder with the path to the
 folder.::
 
-        cd /.local/lib/python2.7/site-pakcages  # create directory if it does not exists
-        echo "/home/<user>/local/opt/ymraster" > ymraster.pyh
+        $ cd /.local/lib/python2.7/site-pakcages  # create directory if it does not exists
+        $ echo "/home/<user>/local/opt/ymraster" > ymraster.pth
 
 Now you can import ``ymraster`` in Python.
 
