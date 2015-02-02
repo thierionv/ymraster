@@ -1,19 +1,6 @@
 # -*- coding: utf-8 -*-
 
 """
-Yet one More Raster library
-===========================
-
-The ``ymraster`` module contains classes for manipulating raster images.
-
-It is based on:
-
-* `OTB <http://www.orfeo-toolbox.org/CookBook/>`_ for most raster operations,
-* `GDAL <http://gdal.org/>`_ for reading and writing rasters metadata,
-* `NumPy <http://www.numpy.org/>`_ for matrix computations,
-  rasters efficiently.
-
-
 The ``Raster`` class
 --------------------
 
@@ -28,9 +15,8 @@ It has some attributes:
 >>> raster.meta['width']
 791
 
-
-Module reference
-================
+Functions and methods
+---------------------
 """
 
 try:
@@ -405,11 +391,12 @@ class Raster():
         :param rangeramp: range radius coefficient. This coefficient makes
                           dependent the ``ranger`` of the colorimetry of the
                           filtered pixel:
-                              .. math::
-                                  y = rangeramp * x + ranger.
+                          .. math::
+
+                              y = rangeramp * x + ranger
         :type rangeramp: float
         :returns: two ``Raster`` instances corresponding to the filtered image
-        and the spatial image
+                  and the spatial image
         :rtype: tuple of ``Raster``
         """
         MeanShiftSmoothing = otb.Registry.CreateApplication(
@@ -530,6 +517,7 @@ class Raster():
         """Last step in a LSMS segmentation: vectorize a labeled segmented
         image, turn each object into a polygon. Each polygon will have some
         attribute data:
+
             * the label number as an attribute,
             * the object's mean for each band in the original image,
             * the object's standard deviation for each band in the original
