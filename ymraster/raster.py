@@ -553,25 +553,25 @@ class Raster():
                                                     rangeramp,
                                                     output_spatial_image)
 
-        print "smoothing step has been realized succesfully"
+        print("smoothing step has been realized succesfully")
 
         img_seg = img_smoothed.lsms_seg(img_pos, output_seg_image, spatialr,
                                         ranger)
 
-        print "segmentation step has been realized succesfully"
+        print("segmentation step has been realized succesfully")
 
         if m_step:
             img_merged = img_seg.lsms_merging(img_smoothed, output_merged,
                                               minsize)
 
-            print "merging step has been realized succesfully"
+            print("merging step has been realized succesfully")
 
             img_merged.lsms_vectorisation(self, output_vector)
 
-            print "vectorisation step has been realized succesfully"
+            print("vectorisation step has been realized succesfully")
 
         else:
 
             img_seg.lsms_vectorisation(self, output_vector)
 
-            print "vectorisation step has been realized succesfully"
+            print("vectorisation step has been realized succesfully")
