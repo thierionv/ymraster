@@ -29,13 +29,16 @@ You need to have the following tools installed and properly set up:
   rasters efficiently.
 
 Note that you have to set some environment variables in order for OTB to work.
-Add the following lines to your ``.bashrc`` or adapt them to your environment:
+Add the following lines to your ``.bashrc`` or adapt them to your environment::
+
+        export PYTHONPATH=${PYTHONPATH}${PYTHONPATH:+:}/usr/lib/otb/pyhon
+        export ITK_AUTOLOAD_PATH=/usr/lib/otb/applications
 
 
 Installation
 ````````````
 
-Simple clone the repository in a folder you choose.::
+Simple clone the repository in a folder of your choice::
 
         cd </path/to/folder>  # eg. ~/.local/opt
         git clone https://github.com/ygversil/ymraster.git
@@ -43,8 +46,8 @@ Simple clone the repository in a folder you choose.::
 Then create a .pth file in your ``site-packages`` folder with the path to the folder.::
 
         cd /.local/lib/python2.7/site-pakcages  # create directory if it does not exists
-        echo "~/.local/opt/ymraster"
+        echo "~/.local/opt/ymraster" > ymraster.pyh
 
 Now you can import ``ymraster`` in Python.
 
->>> import yraster
+>>> import ymraster
