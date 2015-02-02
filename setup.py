@@ -8,7 +8,8 @@ here = os.path.abspath(os.path.dirname(__file__))
 
 # Read the version from the relevant file
 with open(os.path.join(here, 'VERSION'), encoding='utf-8') as f:
-    version = f.read()
+    version = f.readline()
+version = version.rstrip('\n')
 
 setup(
     name='ymraster',

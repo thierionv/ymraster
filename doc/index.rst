@@ -3,15 +3,18 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-.. contents
-   .. toctree::
-       :maxdepth: 2
+.. toctree::
+   :maxdepth: 2
 
-Welcome to ymraster's documentation!
-====================================
+==========================
+``ymraster`` documentation
+==========================
 
 .. include:: ../README.rst
 
+
+The ``Raster`` class
+====================
 
 .. automodule:: ymraster.raster
    :members:

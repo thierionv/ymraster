@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
 
 """
-The ``Raster`` class
---------------------
-
 A ``Raster`` instance represents a raster read from a file.
 
 >>> raster = Raster('tests/data/RGB.byte.tif')
@@ -16,7 +13,7 @@ It has some attributes:
 791
 
 Functions and methods
----------------------
+=====================
 """
 
 try:
