@@ -184,7 +184,7 @@ class TestArrayToRaster(unittest.TestCase):
 class TestRaster(unittest.TestCase):
 
     def setUp(self):
-        self.filename = 'tests/data/RGB.byte.tif'
+        self.filename = 'data/RGB.byte.tif'
         self.raster = Raster(self.filename)
 
     def test_should_get_attr_values_of_raster(self):
@@ -213,11 +213,11 @@ class TestRaster(unittest.TestCase):
         self.assertEqual(self.raster.meta['width'], 791)
 
     def test_raster_should_raise_runtime_error_on_missing_file(self):
-        filename = 'tests/data/not_exists.tif'
+        filename = 'data/not_exists.tif'
         self.assertRaises(RuntimeError, Raster, filename)
 
     def test_raster_should_raise_runtime_error_on_wrong_type_file(self):
-        filename = 'tests/data/foo.txt'
+        filename = 'data/foo.txt'
         self.assertRaises(RuntimeError, Raster, filename)
 
     def test_should_get_array_of_raster(self):
@@ -230,7 +230,7 @@ class TestRaster(unittest.TestCase):
 class TestConcatenateImages(unittest.TestCase):
 
     def setUp(self):
-        self.folder = 'tests/data'
+        self.folder = 'data'
 
     def test_concatenate_should_work_when_same_size_same_proj(self):
         rasters = [Raster(os.path.join(self.folder, filename))
@@ -266,11 +266,11 @@ class TestConcatenateImages(unittest.TestCase):
 class TestFusion(unittest.TestCase):
 
     def setUp(self):
-        self.ms = Raster('tests/data/Spot6_MS_31072013.tif')
+        self.ms = Raster('data/Spot6_MS_31072013.tif')
 
     def test_fusion_should_work_if_same_date_same_projection(self):
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
-        pan = Raster('tests/data/Spot6_Pan_31072013.tif')
+        pan = Raster('data/Spot6_Pan_31072013.tif')
         self.ms.fusion(pan, out_file.name)
         _check_output_image(tester=self,
                             filename=out_file.name,
@@ -283,7 +283,7 @@ class TestFusion(unittest.TestCase):
 
     def test_fusion_should_raise_assertion_error_if_not_same_proj(self):
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
-        pan = Raster('tests/data/Spot6_Pan_31072013_unproj.tif')
+        pan = Raster('data/Spot6_Pan_31072013_unproj.tif')
         self.assertRaises(AssertionError, self.ms.fusion, pan,
                           out_file.name)
 
@@ -299,7 +299,7 @@ class TestFusion(unittest.TestCase):
 class TestOtbFunctions(unittest.TestCase):
 
     def setUp(self):
-        self.raster = Raster('tests/data/l8_20130714.tif')
+        self.raster = Raster('data/l8_20130714.tif')
 
     def test_should_remove_band(self):
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
