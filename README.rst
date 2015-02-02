@@ -3,14 +3,11 @@ Yet one More Raster library
 
 The ``ymraster`` package contains tools for manipulating raster images.
 
-Simply create a ``Raster`` instance giving the filename of the raster you want to read.
+For example, you can simply create a ``Raster`` instance and compute the NDVI
+with the following two commands.
 
 >>> raster = Raster('data/l8_20130425.tif')
-
-You can then for example compute the NDVI.
-
 >>> ndvi = raster.ndvi(idx_red=4, idx_nir=5)
->>> ndvi.meta['count'] = 1
 
 
 How to install
@@ -28,7 +25,8 @@ You need to have the following tools installed and properly set up:
 * `rasterio <https://github.com/mapbox/rasterio>`_ for reading and saving
   rasters efficiently.
 
-The first three are most certainly packaged in your Linux distribution. For the last one use pip.::
+The first three are most certainly packaged in your Linux distribution. For the
+last one use pip.::
 
         pip install --user rasterio
 
@@ -47,7 +45,8 @@ Simple clone the repository in a folder of your choice::
         cd </path/to/folder>  # eg. ~/.local/opt
         git clone https://github.com/ygversil/ymraster.git
 
-Then create a .pth file in your ``site-packages`` folder with the path to the folder.::
+Then create a .pth file in your ``site-packages`` folder with the path to the
+folder.::
 
         cd /.local/lib/python2.7/site-pakcages  # create directory if it does not exists
         echo "/home/<user>/local/opt/ymraster" > ymraster.pyh
