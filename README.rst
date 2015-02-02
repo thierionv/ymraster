@@ -20,10 +20,8 @@ You need to have the following tools installed and properly set up:
 
 * `Orfeo Toolbox <http://www.orfeo-toolbox.org/CookBook/>`_ (OTB) for most
   raster computations,
-* `GDAL <http://gdal.org/>`_ for reading and writing rasters metadata,
+* `GDAL <http://gdal.org/>`_ for reading and writing rasters,
 * `NumPy <http://www.numpy.org/>`_ for matrix & numeric computations,
-* `rasterio <https://github.com/mapbox/rasterio>`_ for reading and saving
-  rasters efficiently.
 
 The first three are most certainly packaged in your Linux distribution. For the
 last one use pip.::
