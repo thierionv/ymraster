@@ -7,7 +7,7 @@ For example, you can simply create a ``Raster`` instance and compute the NDVI
 with the following two commands.
 
 >>> raster = Raster('data/l8_20130425.tif')
->>> ndvi = raster.ndvi(idx_red=4, idx_nir=5)
+>>> ndvi = raster.ndvi('l8_20130425_ndvi.tif', idx_red=4, idx_nir=5)
 
 
 How to install
