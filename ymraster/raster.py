@@ -11,7 +11,6 @@ It is based on:
 * `OTB <http://www.orfeo-toolbox.org/CookBook/>`_ for most raster operations,
 * `GDAL <http://gdal.org/>`_ for reading and writing rasters metadata,
 * `NumPy <http://www.numpy.org/>`_ for matrix computations,
-* `rasterio <https://github.com/mapbox/rasterio>`_ for reading and saving
   rasters efficiently.
 
 
@@ -64,7 +63,6 @@ except ImportError as e:
     raise ImportError(
         str(e) + "\n\nPlease install NumPy.")
 import dtype
-import rasterio
 
 from fix_proj_decorator import fix_missing_proj
 
@@ -72,7 +70,8 @@ import os
 from tempfile import gettempdir
 
 
-def _save_array(array, out_filename, meta):
+def _save_array(array, out_filename, driver_name, dtype, proj=None,
+                geotransform=None, date=None):
     """Write an NumPy array to an image file.
 
     :param array: the NumPy array to save
@@ -80,16 +79,37 @@ def _save_array(array, out_filename, meta):
     :param meta: dict about the image (height, size, data type (int16,
     float64, etc.), projection, ...)
     """
+    # Get array size
     if array.ndim >= 4:
         raise NotImplementedError('Do not support 4+-dimensional arrays')
-    with rasterio.drivers():
-        with rasterio.open(out_filename, 'w', **meta) as raster:
-            number_bands = meta['count']
-            if number_bands == 1:
-                raster.write_band(1, array)
-            else:
-                for i in range(number_bands):
-                    raster.write_band(i+1, array[:, :, i])
+    if array.ndim == 3:
+        ysize, xsize, number_bands = array.shape
+    else:
+        ysize, xsize = array.shape
+        number_bands = 1
+
+    # Create an empty raster of correct size
+    driver = gdal.GetDriverByName(driver_name)
+    out_raster = driver.Create(out_filename,
+                               xsize,
+                               ysize,
+                               number_bands,
+                               dtype.gdal_dtype)
+    if proj is not None:
+        out_raster.SetProjection(proj)
+    if geotransform is not None:
+        out_raster.SetGeoTransform(geotransform)
+    if number_bands == 1:
+        band = out_raster.GetRasterBand(1)
+        band.WriteArray(array)
+        band.FlushCache()
+    else:
+        for i in range(number_bands):
+            band = out_raster.GetRasterBand(i+1)
+            band.WriteArray(array[:, :, i])
+            band.FlushCache()
+    out_raster = None
+    band = None
 
 
 def concatenate_images(rasters, out_filename):
@@ -184,10 +204,11 @@ class Raster():
                          dtype=self.meta['dtype'].numpy_dtype)
 
         # Fill the array
-        with rasterio.drivers(CPL_DEBUG=True):  # Register GDAL format drivers
-            with rasterio.open(self.filename) as img:
-                for i in range(self.meta['count']):
-                    array[:, :, i] = img.read_band(i+1)
+        ds = gdal.Open(self.filename, gdal.GA_ReadOnly)
+        for i in range(self.meta['count']):
+            array[:, :, i] = ds.GetRasterBand(i+1).ReadAsArray()
+        ds = None
+
         return array
 
     def set_projection(self, srs):
