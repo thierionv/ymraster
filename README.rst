@@ -20,6 +20,7 @@ Prerequisites
 `````````````
 
 You need to have the following tools installed and properly set up:
+
 * `Orfeo Toolbox <http://www.orfeo-toolbox.org/CookBook/>`_ (OTB) for most
   raster computations,
 * `GDAL <http://gdal.org/>`_ for reading and writing rasters metadata,
@@ -43,3 +44,7 @@ Then create a .pth file in your ``site-packages`` folder with the path to the fo
 
         cd /.local/lib/python2.7/site-pakcages  # create directory if it does not exists
         echo "~/.local/opt/ymraster"
+
+Now you can import ``ymraster`` in Python.
+
+>>> import yraster
