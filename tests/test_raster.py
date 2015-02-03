@@ -184,6 +184,7 @@ class TestRaster(unittest.TestCase):
         self.assertEqual(raster.meta['height'], 718)
         self.assertEqual(raster.meta['count'], 3)
         self.assertEqual(raster.meta['dtype'].lstr_dtype, 'uint8')
+        self.assertEqual(raster.meta['block_size'], (791, 3))
         self.assertIsNone(raster.meta['datetime'])
         self.assertEqual(raster.meta['gdal_extent'],
                          ((101985.000, 2826915.000),
@@ -215,6 +216,31 @@ class TestRaster(unittest.TestCase):
     def test_raster_should_raise_runtime_error_on_wrong_type_file(self):
         filename = 'data/foo.txt'
         self.assertRaises(RuntimeError, Raster, filename)
+
+    def test_should_get_block_list_from_raster(self):
+        filename = 'data/RGB.byte.tif'
+        raster = Raster(filename)
+        blocks = raster.blocks()
+        self.assertEqual(blocks[0], (0, 0, raster.meta['block_size'][0],
+                                     raster.meta['block_size'][1]))
+        self.assertEqual(blocks[-1], (0, 717, raster.meta['block_size'][0], 1))
+        self.assertEqual(sum([block[3] for block in blocks]),
+                         raster.meta['height'])
+        self.assertEqual(len(blocks), 240)
+
+    def test_should_get_block_list_with_given_size_from_raster(self):
+        filename = 'data/RGB.byte.tif'
+        raster = Raster(filename)
+        xsize = 7
+        ysize = 2
+        lastx = raster.meta['width'] - xsize
+        lasty = raster.meta['height'] - ysize
+        number_blocks = \
+            raster.meta['width'] / xsize * raster.meta['height'] / ysize
+        blocks = raster.blocks(block_size=(xsize, ysize))
+        self.assertEqual(blocks[0], (0, 0, xsize, ysize))
+        self.assertEqual(blocks[-1], (lastx, lasty, xsize, ysize))
+        self.assertEqual(len(blocks), number_blocks)
 
     def test_should_get_array_of_raster(self):
         filename = 'data/RGB.byte.tif'

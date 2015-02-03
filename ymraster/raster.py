@@ -165,13 +165,15 @@ class Raster():
         ds = gdal.Open(self.filename, gdal.GA_ReadOnly)
         self.meta = {}
         self.meta['driver'] = ds.GetDriver()            # gdal.Driver object
-        self.meta['count'] = ds.RasterCount             # int
         self.meta['width'] = ds.RasterXSize             # int
         self.meta['height'] = ds.RasterYSize            # int
-        self.meta['dtype'] = dtype.RasterDataType(      # RasterDataType object
-            gdal_dtype=ds.GetRasterBand(1).DataType)
-        try:
-            self.meta['datetime'] = datetime.strptime(  # datetime object
+        self.meta['count'] = ds.RasterCount             # int
+        self.meta['dtype'] = dtype.RasterDataType(
+            gdal_dtype=ds.GetRasterBand(1).DataType)    # RasterDataType object
+        self.meta['block_size'] = tuple(
+            ds.GetRasterBand(1).GetBlockSize())         # tuple
+        try:                                            # datetime object
+            self.meta['datetime'] = datetime.strptime(
                 ds.GetMetadataItem('TIFFTAG_DATETIME'), '%Y:%m:%d %H:%M:%S')
         except ValueError:  # string has wrong datetime format
             self.meta['datetime'] = None
@@ -197,6 +199,37 @@ class Raster():
 
         # Close file
         ds = None
+
+    def blocks(self, block_size=None):
+        """Returns a list of blocks of the given size for the raster.
+
+        It takes care of adjusting the size for blocks at right and bottom of
+        the raster.
+
+        :param block_size: wanted size for the blocks (defaults to the "natural"
+                           block size of the raster
+        :type block_size: tuple (xsize, ysize)
+        :rtype: list of tuples in the form (i, j, xsize, ysize)
+        """
+        # Default size for blocks
+        xsize, ysize = block_size \
+            if block_size is not None \
+            else self.meta['block_size']
+
+        # Compute the list
+        block_list = []
+        for i in range(0, self.meta['height'], ysize):
+            # Block height is ysize except at the bottom of the raster
+            number_rows = ysize \
+                if i + ysize < self.meta['height'] \
+                else self.meta['height'] - i
+            for j in range(0, self.meta['width'], xsize):
+                # Block width is xsize except at the right of the raster
+                number_cols = xsize \
+                    if j + ysize < self.meta['width'] \
+                    else self.meta['width'] - j
+                block_list.append((j, i, number_cols, number_rows))
+        return block_list
 
     def array(self):
         """Returns the NumPy array corresponding to the raster.
