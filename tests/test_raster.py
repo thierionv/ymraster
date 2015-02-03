@@ -6,11 +6,13 @@ import tempfile
 
 from ymraster import _save_array, concatenate_images, Raster
 from ymraster.dtype import RasterDataType
-from osgeo import gdal, ogr
+from osgeo import gdal, ogr, osr
 import numpy as np
 
-import os
 import re
+import os
+import shutil
+from datetime import datetime
 import subprocess
 
 
@@ -36,7 +38,7 @@ def _check_output_image(tester,
                         dtype,
                         proj=None,
                         transform=None,
-                        date=None,
+                        datetime=None,
                         min_=None,
                         max_=None,
                         mean=None,
@@ -173,15 +175,18 @@ class TestArrayToRaster(unittest.TestCase):
 
 class TestRaster(unittest.TestCase):
 
-    def setUp(self):
-        self.filename = 'data/RGB.byte.tif'
-        self.raster = Raster(self.filename)
-
     def test_should_get_attr_values_of_raster(self):
-        self.assertEqual(self.raster.filename, self.filename)
-        self.assertEqual(self.raster.meta['count'], 3)
+        filename = 'data/RGB.byte.tif'
+        raster = Raster(filename)
+        self.assertEqual(raster.filename, filename)
+        self.assertEqual(raster.meta['driver'].GetDescription(), u'GTiff')
+        self.assertEqual(raster.meta['width'], 791)
+        self.assertEqual(raster.meta['height'], 718)
+        self.assertEqual(raster.meta['count'], 3)
+        self.assertEqual(raster.meta['dtype'].lstr_dtype, 'uint8')
+        self.assertIsNone(raster.meta['datetime'])
         self.assertEqual(
-            self.raster.meta['srs'].ExportToWkt(),
+            raster.meta['srs'].ExportToWkt(),
             'PROJCS["UTM Zone 18, Northern Hemisphere",GEOGCS["Unknown datum '
             'based upon the WGS 84 ellipsoid",DATUM["Not_specified_based_on'
             '_WGS_84_spheroid",SPHEROID["WGS 84",6378137,298.257223563,'
@@ -191,16 +196,12 @@ class TestRaster(unittest.TestCase):
             '-75],PARAMETER["scale_factor",0.9996],PARAMETER["false_easting",'
             '500000],PARAMETER["false_northing",0],UNIT["metre",1,'
             'AUTHORITY["EPSG","9001"]]]')
-        self.assertEqual(self.raster.meta['dtype'].lstr_dtype, 'uint8')
-        self.assertEqual(self.raster.meta['driver'].GetDescription(), u'GTiff')
-        self.assertEqual(self.raster.meta['transform'], (101985.0,
-                                                         300.0379266750948,
-                                                         0.0,
-                                                         2826915.0,
-                                                         0.0,
-                                                         -300.041782729805))
-        self.assertEqual(self.raster.meta['height'], 718)
-        self.assertEqual(self.raster.meta['width'], 791)
+        self.assertEqual(raster.meta['transform'], (101985.0,
+                                                    300.0379266750948,
+                                                    0.0,
+                                                    2826915.0,
+                                                    0.0,
+                                                    -300.041782729805))
 
     def test_raster_should_raise_runtime_error_on_missing_file(self):
         filename = 'data/not_exists.tif'
@@ -211,10 +212,49 @@ class TestRaster(unittest.TestCase):
         self.assertRaises(RuntimeError, Raster, filename)
 
     def test_should_get_array_of_raster(self):
-        array = self.raster.array()
+        filename = 'data/RGB.byte.tif'
+        raster = Raster(filename)
+        array = raster.array()
         self.assertEqual(array.ndim, 3)
         self.assertEqual(array.shape, (718, 791, 3))
         self.assertEqual(array.dtype, 'UInt8')
+
+    def test_should_set_projection(self):
+        filename = 'data/RGB_unproj.byte.tif'
+        tmp_file = tempfile.NamedTemporaryFile(suffix='.tif')
+        shutil.copyfile(filename, tmp_file.name)
+        raster = Raster(tmp_file.name)
+        self.assertIsNone(raster.meta['srs'])
+        srs = osr.SpatialReference()
+        srs.ImportFromEPSG(4326)
+        raster.set_projection(srs)
+        _check_output_image(self,
+                            tmp_file.name,
+                            u'GTiff',
+                            791,
+                            718,
+                            3,
+                            'Byte',
+                            proj=srs.ExportToProj4())
+        self.assertEqual(raster.meta['srs'], srs)
+
+    def test_should_set_date(self):
+        filename = 'data/RGB_unproj.byte.tif'
+        tmp_file = tempfile.NamedTemporaryFile(suffix='.tif')
+        shutil.copyfile(filename, tmp_file.name)
+        raster = Raster(tmp_file.name)
+        self.assertIsNone(raster.meta['datetime'])
+        dt = datetime(2014, 01, 01)
+        raster.set_datetime(dt)
+        _check_output_image(self,
+                            tmp_file.name,
+                            u'GTiff',
+                            791,
+                            718,
+                            3,
+                            'Byte',
+                            datetime=dt.strftime('%Y:%m:%d %H:%M:%S'))
+        self.assertEqual(raster.meta['datetime'], dt)
 
 
 class TestConcatenateImages(unittest.TestCase):
