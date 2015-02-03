@@ -584,6 +584,7 @@ class Raster():
         
         #load the image        
         data = gdal.Open(orig_raster.filename)
+        
         # Get some parameters
         nx = data.RasterXSize
         ny = data.RasterYSize
@@ -591,51 +592,51 @@ class Raster():
         GeoTransform = data.GetGeoTransform()
         Projection = data.GetProjection()
         
-        #--- Load the image in a array        
-        # Initialization of the array
-        im = np.empty((ny,nx))
-        # Read each band iteratively    
-        
         #load the label file and sort his values
         label = gdal.Open(self.filename)
         L = label.GetRasterBand(1).ReadAsArray()
         L_sorted = np.unique(L)
         
+        #calcul the number of stats to be calculated per type (percentile or
+        #others)
         if "per" in stats :
-            len_per = len(percentile)
-            len_var = len(stats) - 1
+            len_per = len(percentile) #number of percentiles
+            len_var = len(stats) - 1 #number of other stats
         else :
             len_per = 0
             len_var = len(stats)
         nb_var = len_per + len_var
-        d_obj = d * nb_var
-        obj = np.empty((ny,nx,d_obj))
-        #methods = {}
-        #t = [0,0]
-        #j = 0
-        #methods["mean"] = im[t[0],t[1],j].mean
-        #methods["min"] = im[t[0],t[1],j].min
-        #methods["max"] = im[t[0],t[1],j].max
-        #methods["std"] = im[t[0],t[1],j].std
+        d_obj = d * nb_var #number of band in the object
         
+        fn = {}        
+        fn["mean"] = np.mean        
+        fn["std"] = np.std
+        fn["min"] = np.min 
+        fn["max"] = np.max 
+        fn["per"] = np.percentile 
+        # Initialization of the array that will received each band iteratively
+        im = np.empty((ny,nx))
+        
+        #Create the object file
         driver= gdal.GetDriverByName(ext)
         output = driver.Create(out_filename, nx, ny, d_obj, gdal.GDT_Float64)
         output.SetGeoTransform(GeoTransform)
         output.SetProjection(Projection)
         
-        for j in range(d):
-            im = data.GetRasterBand(j+1).ReadAsArray()
+        #Compute the object image
+        for j in range(d): #for each band
+            im = data.GetRasterBand(j+1).ReadAsArray()#load the band in a array
             obj = np.empty((ny,nx))
-            for k in range(len_var):            
+            for k in range(len_var):#for each stat which is not a percentile            
                 name = stats[k]                
-                for i in L_sorted:
+                for i in L_sorted:#for each label
                     t = np.where(L==i)
-                    obj[t[0],t[1]] = getattr(im[t[0],t[1]], name)()
-                    
+                    obj[t[0],t[1]] = getattr(im[t[0],t[1]], name)()    
                 temp = output.GetRasterBand(j * nb_var + k +1)
                 temp.WriteArray(obj[:,:])
                 temp.FlushCache()
-            for l in range(len_per):
+                
+            for l in range(len_per):#for each percentile
                 per = percentile[l]
                 for i in L_sorted:
                     t = np.where(L==i)
@@ -644,15 +645,84 @@ class Raster():
                 temp = output.GetRasterBand(j * nb_var + k +1)
                 temp.WriteArray(obj[:,:])
                 temp.FlushCache()
-                
-        
-        
-
-            
 
         ## Close the files    
         label = None
         data = None
         output = None
                 
+    def get_stat2(self, orig_raster, out_filename, stats = 
+                ["mean","std","min","max","per"], percentile = [20,40,50,60,80]
+                , ext = "Gtiff"):
+        """
+        """
         
+        #load the image        
+        data = gdal.Open(orig_raster.filename)
+        
+        # Get some parameters
+        nx = data.RasterXSize
+        ny = data.RasterYSize
+        d = data.RasterCount
+        GeoTransform = data.GetGeoTransform()
+        Projection = data.GetProjection()
+        
+        #load the label file and sort his values
+        label = gdal.Open(self.filename)
+        L = label.GetRasterBand(1).ReadAsArray()
+        L_sorted = np.unique(L)
+        
+        #calcul the number of stats to be calculated per type (percentile or
+        #others)
+        if "per" in stats :
+            len_per = len(percentile) #number of percentiles
+            len_var = len(stats) - 1 #number of other stats
+        else :
+            len_per = 0
+            len_var = len(stats)
+        nb_var = len_per + len_var
+        d_obj = d * nb_var #number of band in the object
+        
+        #creation of function dictionnary
+        fn = {}        
+        fn["mean"] = np.mean        
+        fn["std"] = np.std
+        fn["min"] = np.min 
+        fn["max"] = np.max 
+        fn["per"] = np.percentile 
+        
+        # Initialization of the array that will received each band iteratively
+        im = np.empty((ny,nx))
+        
+        #Create the object file
+        driver= gdal.GetDriverByName(ext)
+        output = driver.Create(out_filename, nx, ny, d_obj, gdal.GDT_Float64)
+        output.SetGeoTransform(GeoTransform)
+        output.SetProjection(Projection)
+        
+        #Compute the object image
+        for j in range(d): #for each band
+            im = data.GetRasterBand(j+1).ReadAsArray()#load the band in a array
+            obj = np.empty((ny,nx))
+            for k in range(nb_var):#for each stat           
+                if k < len_var: #if this is not a percentile               
+                    name = stats[k]
+                    for i in L_sorted:#for each label
+                        t = np.where(L==i)
+                        obj[t[0],t[1]] = fn[name](im[t[0],t[1]]) 
+                else:#if this is a percentile
+                    name = "per"
+                    arg = percentile[k - len_var]
+                    for i in L_sorted:#for each label
+                        t = np.where(L==i)
+                        obj[t[0],t[1]] = fn[name](im[t[0],t[1]],arg) 
+                       
+                temp = output.GetRasterBand(j * nb_var + k +1)
+                temp.WriteArray(obj[:,:])
+                temp.FlushCache()
+                
+
+        ## Close the files    
+        label = None
+        data = None
+        output = None
