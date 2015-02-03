@@ -575,3 +575,84 @@ class Raster():
             img_seg.lsms_vectorisation(self, output_vector)
 
             print "vectorisation step has been realized succesfully"
+    
+    def get_stat(self, orig_raster, out_filename, stats = 
+                ["mean","std","min","max","per"], percentile = [20,40,50,60,80]
+                , ext = "Gtiff"):
+        """
+        """
+        
+        #load the image        
+        data = gdal.Open(orig_raster.filename)
+        # Get some parameters
+        nx = data.RasterXSize
+        ny = data.RasterYSize
+        d = data.RasterCount
+        GeoTransform = data.GetGeoTransform()
+        Projection = data.GetProjection()
+        
+        #--- Load the image in a array        
+        # Initialization of the array
+        im = np.empty((ny,nx))
+        # Read each band iteratively    
+        
+        #load the label file and sort his values
+        label = gdal.Open(self.filename)
+        L = label.GetRasterBand(1).ReadAsArray()
+        L_sorted = np.unique(L)
+        
+        if "per" in stats :
+            len_per = len(percentile)
+            len_var = len(stats) - 1
+        else :
+            len_per = 0
+            len_var = len(stats)
+        nb_var = len_per + len_var
+        d_obj = d * nb_var
+        obj = np.empty((ny,nx,d_obj))
+        #methods = {}
+        #t = [0,0]
+        #j = 0
+        #methods["mean"] = im[t[0],t[1],j].mean
+        #methods["min"] = im[t[0],t[1],j].min
+        #methods["max"] = im[t[0],t[1],j].max
+        #methods["std"] = im[t[0],t[1],j].std
+        
+        driver= gdal.GetDriverByName(ext)
+        output = driver.Create(out_filename, nx, ny, d_obj, gdal.GDT_Float64)
+        output.SetGeoTransform(GeoTransform)
+        output.SetProjection(Projection)
+        
+        for j in range(d):
+            im = data.GetRasterBand(j+1).ReadAsArray()
+            obj = np.empty((ny,nx))
+            for k in range(len_var):            
+                name = stats[k]                
+                for i in L_sorted:
+                    t = np.where(L==i)
+                    obj[t[0],t[1]] = getattr(im[t[0],t[1]], name)()
+                    
+                temp = output.GetRasterBand(j * nb_var + k +1)
+                temp.WriteArray(obj[:,:])
+                temp.FlushCache()
+            for l in range(len_per):
+                per = percentile[l]
+                for i in L_sorted:
+                    t = np.where(L==i)
+                    obj[t[0],t[1]] = np.percentile(im[t[0],t[1]], per)
+                k = l + len_var
+                temp = output.GetRasterBand(j * nb_var + k +1)
+                temp.WriteArray(obj[:,:])
+                temp.FlushCache()
+                
+        
+        
+
+            
+
+        ## Close the files    
+        label = None
+        data = None
+        output = None
+                
+        
