@@ -621,7 +621,7 @@ class Raster():
         """Calcul statistics of the labels from a label image and raster. The
         statistics calculated by default are : mean, standard deviation, min,
         max and the 20, 40, 50, 60, 80th percentiles. The output is an image 
-        at the given format that contains n_band * n_stat_features band. This
+        at the given format that contains n_band * n_stat_features bands. This
         method use the GDAL et NUMPY library.
         
         :param orig_raster: The raster object on which the statistics are
@@ -706,7 +706,7 @@ class Raster():
         """Calcul statistics of the labels from a label image and raster. The
         statistics calculated by default are : mean, standard deviation, min,
         max and the 20, 40, 50, 60, 80th percentiles. The output is an image 
-        at the given format that contains n_band * n_stat_features band. This
+        at the given format that contains n_band * n_stat_features bands. This
         method use the GDAL et NUMPY library.
         
         :param orig_raster: The raster object on which the statistics are
@@ -717,7 +717,7 @@ class Raster():
                         per.
         :param percentile: List of the percentile to be calculated. By default,
                             the percentiles are 20, 40, 50, 60, 80.
-        :param ext: format in wich the output image is written. Any formats
+        :param ext: Format in wich the output image is written. Any formats
                     supported by GDAL
         """
         
