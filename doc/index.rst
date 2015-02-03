@@ -6,10 +6,15 @@
 .. toctree::
    :maxdepth: 2
 
-Welcome to ymraster's documentation!
-====================================
+==========================
+``ymraster`` documentation
+==========================
 
-Contents:
+.. include:: ../README.rst
+
+
+The ``Raster`` class
+====================
 
 .. automodule:: ymraster.raster
    :members:

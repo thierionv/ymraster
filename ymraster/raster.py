@@ -1,23 +1,6 @@
 # -*- coding: utf-8 -*-
 
 """
-Yet one More Raster library
-===========================
-
-The ``ymraster`` module contains classes for manipulating raster images.
-
-It is based on:
-
-* `OTB <http://www.orfeo-toolbox.org/CookBook/>`_ for most raster operations,
-* `GDAL <http://gdal.org/>`_ for reading and writing rasters metadata,
-* `NumPy <http://www.numpy.org/>`_ for matrix computations,
-* `rasterio <https://github.com/mapbox/rasterio>`_ for reading and saving
-  rasters efficiently.
-
-
-The ``Raster`` class
---------------------
-
 A ``Raster`` instance represents a raster read from a file.
 
 >>> raster = Raster('tests/data/RGB.byte.tif')
@@ -29,9 +12,8 @@ It has some attributes:
 >>> raster.meta['width']
 791
 
-
-Module reference
-================
+Functions and methods
+=====================
 """
 
 try:
@@ -64,15 +46,16 @@ except ImportError as e:
     raise ImportError(
         str(e) + "\n\nPlease install NumPy.")
 import dtype
-import rasterio
 
 from fix_proj_decorator import fix_missing_proj
 
+from datetime import datetime
 import os
 from tempfile import gettempdir
 
 
-def _save_array(array, out_filename, meta):
+def _save_array(array, out_filename, driver_name, dtype, proj=None,
+                geotransform=None, date=None):
     """Write an NumPy array to an image file.
 
     :param array: the NumPy array to save
@@ -80,16 +63,37 @@ def _save_array(array, out_filename, meta):
     :param meta: dict about the image (height, size, data type (int16,
     float64, etc.), projection, ...)
     """
+    # Get array size
     if array.ndim >= 4:
         raise NotImplementedError('Do not support 4+-dimensional arrays')
-    with rasterio.drivers():
-        with rasterio.open(out_filename, 'w', **meta) as raster:
-            number_bands = meta['count']
-            if number_bands == 1:
-                raster.write_band(1, array)
-            else:
-                for i in range(number_bands):
-                    raster.write_band(i+1, array[:, :, i])
+    if array.ndim == 3:
+        ysize, xsize, number_bands = array.shape
+    else:
+        ysize, xsize = array.shape
+        number_bands = 1
+
+    # Create an empty raster of correct size
+    driver = gdal.GetDriverByName(driver_name)
+    out_raster = driver.Create(out_filename,
+                               xsize,
+                               ysize,
+                               number_bands,
+                               dtype.gdal_dtype)
+    if proj is not None:
+        out_raster.SetProjection(proj)
+    if geotransform is not None:
+        out_raster.SetGeoTransform(geotransform)
+    if number_bands == 1:
+        band = out_raster.GetRasterBand(1)
+        band.WriteArray(array)
+        band.FlushCache()
+    else:
+        for i in range(number_bands):
+            band = out_raster.GetRasterBand(i+1)
+            band.WriteArray(array[:, :, i])
+            band.FlushCache()
+    out_raster = None
+    band = None
 
 
 def concatenate_images(rasters, out_filename):
@@ -98,7 +102,7 @@ def concatenate_images(rasters, out_filename):
     All bands in all input rasters must have same size.
 
     Moreover, this function is quite conservative about projections: all bands
-    should have the same projection
+    should have the same projection and same extent
 
     Finally, if data types are different, then everything will be converted to
     the default data type in OTB (_float_ currently).
@@ -108,17 +112,22 @@ def concatenate_images(rasters, out_filename):
     :param out_filename: path to the output file
     :type out_filename: str to the output file
     """
-    # Check for size, proj, transform & type (and that list not empty)
+    # Check for proj, extent & type (and that list not empty)
     raster0 = rasters[0]
-    srs, otb_dtype = (raster0.meta['srs'], raster0.meta['dtype'].otb_dtype)
+    srs, extent, otb_dtype = (raster0.meta['srs'],
+                              raster0.meta['gdal_extent'],
+                              raster0.meta['dtype'].otb_dtype)
     assert srs is not None, \
-        "Image has no Coordinate Reference System : '{}'".format(
+        "Image has no Coordinate Reference System: '{}'".format(
             raster0.filename)
     same_type = True
     for raster in rasters:
         assert raster.meta['srs'] is not None \
             and raster.meta['srs'].IsSame(srs), \
-            "Images have not the same Coordinate Reference System : "
+            "Images have not the same Coordinate Reference System: "
+        "'{}' and '{}'".format(raster0.filename, raster.filename)
+        assert raster.meta['gdal_extent'] == extent, \
+            "Images have not the same extent: "
         "'{}' and '{}'".format(raster0.filename, raster.filename)
         if raster.meta['dtype'].otb_dtype != otb_dtype:
             same_type = False
@@ -155,14 +164,30 @@ class Raster():
         # Read information from image
         ds = gdal.Open(self.filename, gdal.GA_ReadOnly)
         self.meta = {}
-        self.meta['driver'] = ds.GetDriver()          # gdal.Driver object
-        self.meta['count'] = ds.RasterCount           # int
-        self.meta['width'] = ds.RasterXSize           # int
-        self.meta['height'] = ds.RasterYSize          # int
-        self.meta['dtype'] = dtype.RasterDataType(    # RasterDataType object
+        self.meta['driver'] = ds.GetDriver()            # gdal.Driver object
+        self.meta['count'] = ds.RasterCount             # int
+        self.meta['width'] = ds.RasterXSize             # int
+        self.meta['height'] = ds.RasterYSize            # int
+        self.meta['dtype'] = dtype.RasterDataType(      # RasterDataType object
             gdal_dtype=ds.GetRasterBand(1).DataType)
-        self.meta['transform'] = ds.GetGeoTransform(  # tuple
+        try:
+            self.meta['datetime'] = datetime.strptime(  # datetime object
+                ds.GetMetadataItem('TIFFTAG_DATETIME'), '%Y:%m:%d %H:%M:%S')
+        except ValueError:  # string has wrong datetime format
+            self.meta['datetime'] = None
+        except TypeError:   # there is no DATETIME tag
+            self.meta['datetime'] = None
+        self.meta['transform'] = ds.GetGeoTransform(    # tuple
             can_return_null=True)
+        self.meta['gdal_extent'] = tuple(               # tuple
+            (ds.GetGeoTransform()[0]
+             + x * ds.GetGeoTransform()[1]
+             + y * ds.GetGeoTransform()[2],
+             ds.GetGeoTransform()[3]
+             + x * ds.GetGeoTransform()[4]
+             + y * ds.GetGeoTransform()[5])
+            for (x, y) in [(0, 0), (0, ds.RasterYSize), (ds.RasterXSize, 0),
+                           (ds.RasterXSize, ds.RasterYSize)])
 
         # Read spatial reference as a osr.SpatialReference object or None
         # if there is no srs in metadata
@@ -184,10 +209,11 @@ class Raster():
                          dtype=self.meta['dtype'].numpy_dtype)
 
         # Fill the array
-        with rasterio.drivers(CPL_DEBUG=True):  # Register GDAL format drivers
-            with rasterio.open(self.filename) as img:
-                for i in range(self.meta['count']):
-                    array[:, :, i] = img.read_band(i+1)
+        ds = gdal.Open(self.filename, gdal.GA_ReadOnly)
+        for i in range(self.meta['count']):
+            array[:, :, i] = ds.GetRasterBand(i+1).ReadAsArray()
+        ds = None
+
         return array
 
     def set_projection(self, srs):
@@ -200,6 +226,17 @@ class Raster():
         ds.SetProjection(srs.ExportToWkt())
         ds = None
         self.meta['srs'] = srs
+
+    def set_datetime(self, dt):
+        """Writes the given datetime into the raster's metadata.
+
+        :param dt: datetime to set
+        :type dt: datetime.datetime
+        """
+        ds = gdal.Open(self.filename, gdal.GA_Update)
+        ds.SetMetadata({'TIFFTAG_DATETIME': dt.strftime('%Y:%m:%d %H:%M:%S')})
+        ds = None
+        self.meta['datetime'] = dt
 
     def remove_band(self, idx, out_filename):
         """Writes a new raster (in the specified output file) which is the same
@@ -384,11 +421,12 @@ class Raster():
         :param rangeramp: range radius coefficient. This coefficient makes
                           dependent the ``ranger`` of the colorimetry of the
                           filtered pixel:
-                              .. math::
-                                  y = rangeramp * x + ranger.
+                          .. math::
+
+                              y = rangeramp * x + ranger
         :type rangeramp: float
         :returns: two ``Raster`` instances corresponding to the filtered image
-        and the spatial image
+                  and the spatial image
         :rtype: tuple of ``Raster``
         """
         MeanShiftSmoothing = otb.Registry.CreateApplication(
@@ -509,6 +547,7 @@ class Raster():
         """Last step in a LSMS segmentation: vectorize a labeled segmented
         image, turn each object into a polygon. Each polygon will have some
         attribute data:
+
             * the label number as an attribute,
             * the object's mean for each band in the original image,
             * the object's standard deviation for each band in the original
@@ -553,22 +592,22 @@ class Raster():
                                                     rangeramp,
                                                     output_spatial_image)
 
-        print "smoothing step has been realized succesfully"
+        print("smoothing step has been realized succesfully")
 
         img_seg = img_smoothed.lsms_seg(img_pos, output_seg_image, spatialr,
                                         ranger)
 
-        print "segmentation step has been realized succesfully"
+        print("segmentation step has been realized succesfully")
 
         if m_step:
             img_merged = img_seg.lsms_merging(img_smoothed, output_merged,
                                               minsize)
 
-            print "merging step has been realized succesfully"
+            print("merging step has been realized succesfully")
 
             img_merged.lsms_vectorisation(self, output_vector)
 
-            print "vectorisation step has been realized succesfully"
+            print("vectorisation step has been realized succesfully")
 
         else:
 
@@ -579,7 +618,22 @@ class Raster():
     def get_stat(self, orig_raster, out_filename, stats = 
                 ["mean","std","min","max","per"], percentile = [20,40,50,60,80]
                 , ext = "Gtiff"):
-        """
+        """Calcul statistics of the labels from a label image and raster. The
+        statistics calculated by default are : mean, standard deviation, min,
+        max and the 20, 40, 50, 60, 80th percentiles. The output is an image 
+        at the given format that contains n_band * n_stat_features band. This
+        method use the GDAL et NUMPY library.
+        
+        :param orig_raster: The raster object on which the statistics are
+                            calculated
+        :param out_filename: Path of the output image.
+        :param stats: List of the statistics to be calculated. By default, all
+                        the features are calculated, ie mean, std, min, max and
+                        per.
+        :param percentile: List of the percentile to be calculated. By default,
+                            the percentiles are 20, 40, 50, 60, 80.
+        :param ext: format in wich the output image is written. Any formats
+                    supported by GDAL
         """
         
         #load the image        
@@ -608,12 +662,7 @@ class Raster():
         nb_var = len_per + len_var
         d_obj = d * nb_var #number of band in the object
         
-        fn = {}        
-        fn["mean"] = np.mean        
-        fn["std"] = np.std
-        fn["min"] = np.min 
-        fn["max"] = np.max 
-        fn["per"] = np.percentile 
+
         # Initialization of the array that will received each band iteratively
         im = np.empty((ny,nx))
         
@@ -654,7 +703,22 @@ class Raster():
     def get_stat2(self, orig_raster, out_filename, stats = 
                 ["mean","std","min","max","per"], percentile = [20,40,50,60,80]
                 , ext = "Gtiff"):
-        """
+        """Calcul statistics of the labels from a label image and raster. The
+        statistics calculated by default are : mean, standard deviation, min,
+        max and the 20, 40, 50, 60, 80th percentiles. The output is an image 
+        at the given format that contains n_band * n_stat_features band. This
+        method use the GDAL et NUMPY library.
+        
+        :param orig_raster: The raster object on which the statistics are
+                            calculated
+        :param out_filename: Path of the output image.
+        :param stats: List of the statistics to be calculated. By default, all
+                        the features are calculated, ie mean, std, min, max and
+                        per.
+        :param percentile: List of the percentile to be calculated. By default,
+                            the percentiles are 20, 40, 50, 60, 80.
+        :param ext: format in wich the output image is written. Any formats
+                    supported by GDAL
         """
         
         #load the image        
@@ -683,7 +747,7 @@ class Raster():
         nb_var = len_per + len_var
         d_obj = d * nb_var #number of band in the object
         
-        #creation of function dictionnary
+        #creation of a function dictionnary
         fn = {}        
         fn["mean"] = np.mean        
         fn["std"] = np.std
@@ -726,3 +790,4 @@ class Raster():
         label = None
         data = None
         output = None
+

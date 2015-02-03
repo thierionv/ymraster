@@ -5,11 +5,14 @@ import doctest
 import tempfile
 
 from ymraster import _save_array, concatenate_images, Raster
-from osgeo import gdal, ogr
+from ymraster.dtype import RasterDataType
+from osgeo import gdal, ogr, osr
 import numpy as np
 
-import os
 import re
+import os
+import shutil
+from datetime import datetime
 import subprocess
 
 
@@ -19,15 +22,11 @@ def _save_array_unique_value(filename,
                              number_bands,
                              dtype,
                              value):
-    array = np.ones((height, width, number_bands), dtype=dtype) * value \
+    array = np.ones((height, width, number_bands),
+                    dtype=dtype.numpy_dtype) * value \
         if number_bands > 1 \
-        else np.ones((height, width), dtype=dtype) * value
-    meta = {'driver': u'GTiff',
-            'width': width,
-            'height': height,
-            'count': number_bands,
-            'dtype': dtype}
-    _save_array(array, filename, meta)
+        else np.ones((height, width), dtype=dtype.numpy_dtype) * value
+    _save_array(array, filename, driver_name='GTiff', dtype=dtype)
 
 
 def _check_output_image(tester,
@@ -39,7 +38,7 @@ def _check_output_image(tester,
                         dtype,
                         proj=None,
                         transform=None,
-                        date=None,
+                        datetime=None,
                         min_=None,
                         max_=None,
                         mean=None,
@@ -70,7 +69,7 @@ class TestArrayToRaster(unittest.TestCase):
         width = 200
         height = 200
         number_bands = 1
-        dtype = 'UInt16'
+        dtype = RasterDataType(numpy_dtype=np.uint16)
         value = 65535
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
         _save_array_unique_value(out_file.name,
@@ -85,7 +84,7 @@ class TestArrayToRaster(unittest.TestCase):
                             width,
                             height,
                             number_bands,
-                            dtype,
+                            dtype.ustr_dtype,
                             min_=value,
                             max_=value,
                             mean=value,
@@ -95,7 +94,7 @@ class TestArrayToRaster(unittest.TestCase):
         width = 400
         height = 400
         number_bands = 3
-        dtype = 'UInt16'
+        dtype = RasterDataType(numpy_dtype=np.uint16)
         value = 65535
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
         _save_array_unique_value(out_file.name,
@@ -110,7 +109,7 @@ class TestArrayToRaster(unittest.TestCase):
                             width,
                             height,
                             number_bands,
-                            dtype,
+                            dtype.ustr_dtype,
                             min_=value,
                             max_=value,
                             mean=value,
@@ -120,7 +119,7 @@ class TestArrayToRaster(unittest.TestCase):
         width = 800
         height = 600
         number_bands = 3
-        dtype = 'UInt16'
+        dtype = RasterDataType(numpy_dtype=np.uint16)
         value = 65535
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
         _save_array_unique_value(out_file.name,
@@ -135,7 +134,7 @@ class TestArrayToRaster(unittest.TestCase):
                             width,
                             height,
                             number_bands,
-                            dtype,
+                            dtype.ustr_dtype,
                             min_=value,
                             max_=value,
                             mean=value,
@@ -145,32 +144,25 @@ class TestArrayToRaster(unittest.TestCase):
         width = 3
         height = 3
         number_bands = 1
-        dtype = 'UInt16'
+        dtype = RasterDataType(numpy_dtype=np.uint16)
         value = 65536
-        a = np.ones((height, width, number_bands), dtype=dtype) * value
-        meta = {'driver': u'GTiff',
-                'width': width,
-                'height': height,
-                'count': number_bands,
-                'dtype': dtype}
+        a = np.ones((height, width, number_bands),
+                    dtype=dtype.numpy_dtype) * value
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
-        self.assertRaises(ValueError, _save_array, a, out_file.name, meta)
+        self.assertRaises(ValueError, _save_array, a, out_file.name,
+                          driver_name='GTiff', dtype=dtype)
 
     def test_save_array_should_raise_not_implemented_if_four_dimensional(self):
         width = 3
         height = 3
         number_bands = 3
-        dtype = 'UInt16'
+        dtype = RasterDataType(numpy_dtype=np.uint16)
         value = 65535
-        a = np.ones((height, width, number_bands, 1), dtype=dtype) * value
-        meta = {'driver': u'GTiff',
-                'width': width,
-                'height': height,
-                'count': number_bands,
-                'dtype': dtype}
+        a = np.ones((height, width, number_bands, 1),
+                    dtype=dtype.numpy_dtype) * value
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
         self.assertRaises(NotImplementedError, _save_array, a, out_file.name,
-                          meta)
+                          driver_name='GTiff', dtype=dtype)
 
     def tearDown(self):
         tmpdir = tempfile.gettempdir()
@@ -183,15 +175,23 @@ class TestArrayToRaster(unittest.TestCase):
 
 class TestRaster(unittest.TestCase):
 
-    def setUp(self):
-        self.filename = 'tests/data/RGB.byte.tif'
-        self.raster = Raster(self.filename)
-
     def test_should_get_attr_values_of_raster(self):
-        self.assertEqual(self.raster.filename, self.filename)
-        self.assertEqual(self.raster.meta['count'], 3)
+        filename = 'data/RGB.byte.tif'
+        raster = Raster(filename)
+        self.assertEqual(raster.filename, filename)
+        self.assertEqual(raster.meta['driver'].GetDescription(), u'GTiff')
+        self.assertEqual(raster.meta['width'], 791)
+        self.assertEqual(raster.meta['height'], 718)
+        self.assertEqual(raster.meta['count'], 3)
+        self.assertEqual(raster.meta['dtype'].lstr_dtype, 'uint8')
+        self.assertIsNone(raster.meta['datetime'])
+        self.assertEqual(raster.meta['gdal_extent'],
+                         ((101985.000, 2826915.000),
+                          (101985.000, 2611485.000),
+                          (339315.000, 2826915.000),
+                          (339315.000, 2611485.000)))
         self.assertEqual(
-            self.raster.meta['srs'].ExportToWkt(),
+            raster.meta['srs'].ExportToWkt(),
             'PROJCS["UTM Zone 18, Northern Hemisphere",GEOGCS["Unknown datum '
             'based upon the WGS 84 ellipsoid",DATUM["Not_specified_based_on'
             '_WGS_84_spheroid",SPHEROID["WGS 84",6378137,298.257223563,'
@@ -201,36 +201,71 @@ class TestRaster(unittest.TestCase):
             '-75],PARAMETER["scale_factor",0.9996],PARAMETER["false_easting",'
             '500000],PARAMETER["false_northing",0],UNIT["metre",1,'
             'AUTHORITY["EPSG","9001"]]]')
-        self.assertEqual(self.raster.meta['dtype'].lstr_dtype, 'uint8')
-        self.assertEqual(self.raster.meta['driver'].GetDescription(), u'GTiff')
-        self.assertEqual(self.raster.meta['transform'], (101985.0,
-                                                         300.0379266750948,
-                                                         0.0,
-                                                         2826915.0,
-                                                         0.0,
-                                                         -300.041782729805))
-        self.assertEqual(self.raster.meta['height'], 718)
-        self.assertEqual(self.raster.meta['width'], 791)
+        self.assertEqual(raster.meta['transform'], (101985.0,
+                                                    300.0379266750948,
+                                                    0.0,
+                                                    2826915.0,
+                                                    0.0,
+                                                    -300.041782729805))
 
     def test_raster_should_raise_runtime_error_on_missing_file(self):
-        filename = 'tests/data/not_exists.tif'
+        filename = 'data/not_exists.tif'
         self.assertRaises(RuntimeError, Raster, filename)
 
     def test_raster_should_raise_runtime_error_on_wrong_type_file(self):
-        filename = 'tests/data/foo.txt'
+        filename = 'data/foo.txt'
         self.assertRaises(RuntimeError, Raster, filename)
 
     def test_should_get_array_of_raster(self):
-        array = self.raster.array()
+        filename = 'data/RGB.byte.tif'
+        raster = Raster(filename)
+        array = raster.array()
         self.assertEqual(array.ndim, 3)
         self.assertEqual(array.shape, (718, 791, 3))
         self.assertEqual(array.dtype, 'UInt8')
+
+    def test_should_set_projection(self):
+        filename = 'data/RGB_unproj.byte.tif'
+        tmp_file = tempfile.NamedTemporaryFile(suffix='.tif')
+        shutil.copyfile(filename, tmp_file.name)
+        raster = Raster(tmp_file.name)
+        self.assertIsNone(raster.meta['srs'])
+        srs = osr.SpatialReference()
+        srs.ImportFromEPSG(4326)
+        raster.set_projection(srs)
+        _check_output_image(self,
+                            tmp_file.name,
+                            u'GTiff',
+                            791,
+                            718,
+                            3,
+                            'Byte',
+                            proj=srs.ExportToProj4())
+        self.assertEqual(raster.meta['srs'], srs)
+
+    def test_should_set_date(self):
+        filename = 'data/RGB_unproj.byte.tif'
+        tmp_file = tempfile.NamedTemporaryFile(suffix='.tif')
+        shutil.copyfile(filename, tmp_file.name)
+        raster = Raster(tmp_file.name)
+        self.assertIsNone(raster.meta['datetime'])
+        dt = datetime(2014, 01, 01)
+        raster.set_datetime(dt)
+        _check_output_image(self,
+                            tmp_file.name,
+                            u'GTiff',
+                            791,
+                            718,
+                            3,
+                            'Byte',
+                            datetime=dt.strftime('%Y:%m:%d %H:%M:%S'))
+        self.assertEqual(raster.meta['datetime'], dt)
 
 
 class TestConcatenateImages(unittest.TestCase):
 
     def setUp(self):
-        self.folder = 'tests/data'
+        self.folder = 'data'
 
     def test_concatenate_should_work_when_same_size_same_proj(self):
         rasters = [Raster(os.path.join(self.folder, filename))
@@ -248,11 +283,11 @@ class TestConcatenateImages(unittest.TestCase):
                             dtype=rasters[0].meta['dtype'].ustr_dtype,
                             proj=rasters[0].meta['srs'].ExportToProj4())
 
-    def test_concatenate_should_raise_runtime_error_if_not_same_size(self):
+    def test_concatenate_should_raise_assertion_error_if_not_same_extent(self):
         rasters = [Raster(os.path.join(self.folder, 'shade.tif')),
                    Raster(os.path.join(self.folder, 'shade_crop.tif'))]
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
-        self.assertRaises(RuntimeError, concatenate_images, rasters,
+        self.assertRaises(AssertionError, concatenate_images, rasters,
                           out_file.name)
 
     def test_concatenate_should_raise_assertion_error_if_not_same_proj(self):
@@ -266,11 +301,11 @@ class TestConcatenateImages(unittest.TestCase):
 class TestFusion(unittest.TestCase):
 
     def setUp(self):
-        self.ms = Raster('tests/data/Spot6_MS_31072013.tif')
+        self.ms = Raster('data/Spot6_MS_31072013.tif')
 
     def test_fusion_should_work_if_same_date_same_projection(self):
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
-        pan = Raster('tests/data/Spot6_Pan_31072013.tif')
+        pan = Raster('data/Spot6_Pan_31072013.tif')
         self.ms.fusion(pan, out_file.name)
         _check_output_image(tester=self,
                             filename=out_file.name,
@@ -283,7 +318,7 @@ class TestFusion(unittest.TestCase):
 
     def test_fusion_should_raise_assertion_error_if_not_same_proj(self):
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
-        pan = Raster('tests/data/Spot6_Pan_31072013_unproj.tif')
+        pan = Raster('data/Spot6_Pan_31072013_unproj.tif')
         self.assertRaises(AssertionError, self.ms.fusion, pan,
                           out_file.name)
 
@@ -299,7 +334,7 @@ class TestFusion(unittest.TestCase):
 class TestOtbFunctions(unittest.TestCase):
 
     def setUp(self):
-        self.raster = Raster('tests/data/l8_20130714.tif')
+        self.raster = Raster('data/l8_20130714.tif')
 
     def test_should_remove_band(self):
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
