@@ -102,7 +102,7 @@ def concatenate_images(rasters, out_filename):
     All bands in all input rasters must have same size.
 
     Moreover, this function is quite conservative about projections: all bands
-    should have the same projection
+    should have the same projection and same extent
 
     Finally, if data types are different, then everything will be converted to
     the default data type in OTB (_float_ currently).
@@ -112,17 +112,22 @@ def concatenate_images(rasters, out_filename):
     :param out_filename: path to the output file
     :type out_filename: str to the output file
     """
-    # Check for size, proj, transform & type (and that list not empty)
+    # Check for proj, extent & type (and that list not empty)
     raster0 = rasters[0]
-    srs, otb_dtype = (raster0.meta['srs'], raster0.meta['dtype'].otb_dtype)
+    srs, extent, otb_dtype = (raster0.meta['srs'],
+                              raster0.meta['gdal_extent'],
+                              raster0.meta['dtype'].otb_dtype)
     assert srs is not None, \
-        "Image has no Coordinate Reference System : '{}'".format(
+        "Image has no Coordinate Reference System: '{}'".format(
             raster0.filename)
     same_type = True
     for raster in rasters:
         assert raster.meta['srs'] is not None \
             and raster.meta['srs'].IsSame(srs), \
-            "Images have not the same Coordinate Reference System : "
+            "Images have not the same Coordinate Reference System: "
+        "'{}' and '{}'".format(raster0.filename, raster.filename)
+        assert raster.meta['gdal_extent'] == extent, \
+            "Images have not the same extent: "
         "'{}' and '{}'".format(raster0.filename, raster.filename)
         if raster.meta['dtype'].otb_dtype != otb_dtype:
             same_type = False
@@ -165,8 +170,6 @@ class Raster():
         self.meta['height'] = ds.RasterYSize            # int
         self.meta['dtype'] = dtype.RasterDataType(      # RasterDataType object
             gdal_dtype=ds.GetRasterBand(1).DataType)
-        self.meta['transform'] = ds.GetGeoTransform(    # tuple
-            can_return_null=True)
         try:
             self.meta['datetime'] = datetime.strptime(  # datetime object
                 ds.GetMetadataItem('TIFFTAG_DATETIME'), '%Y:%m:%d %H:%M:%S')
@@ -174,6 +177,17 @@ class Raster():
             self.meta['datetime'] = None
         except TypeError:   # there is no DATETIME tag
             self.meta['datetime'] = None
+        self.meta['transform'] = ds.GetGeoTransform(    # tuple
+            can_return_null=True)
+        self.meta['gdal_extent'] = tuple(               # tuple
+            (ds.GetGeoTransform()[0]
+             + x * ds.GetGeoTransform()[1]
+             + y * ds.GetGeoTransform()[2],
+             ds.GetGeoTransform()[3]
+             + x * ds.GetGeoTransform()[4]
+             + y * ds.GetGeoTransform()[5])
+            for (x, y) in [(0, 0), (0, ds.RasterYSize), (ds.RasterXSize, 0),
+                           (ds.RasterXSize, ds.RasterYSize)])
 
         # Read spatial reference as a osr.SpatialReference object or None
         # if there is no srs in metadata

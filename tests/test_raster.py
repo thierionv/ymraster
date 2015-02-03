@@ -185,6 +185,11 @@ class TestRaster(unittest.TestCase):
         self.assertEqual(raster.meta['count'], 3)
         self.assertEqual(raster.meta['dtype'].lstr_dtype, 'uint8')
         self.assertIsNone(raster.meta['datetime'])
+        self.assertEqual(raster.meta['gdal_extent'],
+                         ((101985.000, 2826915.000),
+                          (101985.000, 2611485.000),
+                          (339315.000, 2826915.000),
+                          (339315.000, 2611485.000)))
         self.assertEqual(
             raster.meta['srs'].ExportToWkt(),
             'PROJCS["UTM Zone 18, Northern Hemisphere",GEOGCS["Unknown datum '
@@ -278,11 +283,11 @@ class TestConcatenateImages(unittest.TestCase):
                             dtype=rasters[0].meta['dtype'].ustr_dtype,
                             proj=rasters[0].meta['srs'].ExportToProj4())
 
-    def test_concatenate_should_raise_runtime_error_if_not_same_size(self):
+    def test_concatenate_should_raise_assertion_error_if_not_same_extent(self):
         rasters = [Raster(os.path.join(self.folder, 'shade.tif')),
                    Raster(os.path.join(self.folder, 'shade_crop.tif'))]
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
-        self.assertRaises(RuntimeError, concatenate_images, rasters,
+        self.assertRaises(AssertionError, concatenate_images, rasters,
                           out_file.name)
 
     def test_concatenate_should_raise_assertion_error_if_not_same_proj(self):
