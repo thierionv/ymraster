@@ -49,6 +49,7 @@ import dtype
 
 from fix_proj_decorator import fix_missing_proj
 
+from datetime import datetime
 import os
 from tempfile import gettempdir
 
@@ -158,16 +159,21 @@ class Raster():
         # Read information from image
         ds = gdal.Open(self.filename, gdal.GA_ReadOnly)
         self.meta = {}
-        self.meta['driver'] = ds.GetDriver()          # gdal.Driver object
-        self.meta['count'] = ds.RasterCount           # int
-        self.meta['width'] = ds.RasterXSize           # int
-        self.meta['height'] = ds.RasterYSize          # int
-        self.meta['dtype'] = dtype.RasterDataType(    # RasterDataType object
+        self.meta['driver'] = ds.GetDriver()            # gdal.Driver object
+        self.meta['count'] = ds.RasterCount             # int
+        self.meta['width'] = ds.RasterXSize             # int
+        self.meta['height'] = ds.RasterYSize            # int
+        self.meta['dtype'] = dtype.RasterDataType(      # RasterDataType object
             gdal_dtype=ds.GetRasterBand(1).DataType)
-        self.meta['transform'] = ds.GetGeoTransform(  # tuple
+        self.meta['transform'] = ds.GetGeoTransform(    # tuple
             can_return_null=True)
-        self.meta['block_size'] = tuple(ds.GetRasterBand(
-            1).GetBlockSize())                        # tuple
+        try:
+            self.meta['datetime'] = datetime.strptime(  # datetime object
+                ds.GetMetadataItem('TIFFTAG_DATETIME'), '%Y:%m:%d %H:%M:%S')
+        except ValueError:  # string has wrong datetime format
+            self.meta['datetime'] = None
+        except TypeError:   # there is no DATETIME tag
+            self.meta['datetime'] = None
 
         # Read spatial reference as a osr.SpatialReference object or None
         # if there is no srs in metadata
@@ -206,6 +212,17 @@ class Raster():
         ds.SetProjection(srs.ExportToWkt())
         ds = None
         self.meta['srs'] = srs
+
+    def set_datetime(self, dt):
+        """Writes the given datetime into the raster's metadata.
+
+        :param dt: datetime to set
+        :type dt: datetime.datetime
+        """
+        ds = gdal.Open(self.filename, gdal.GA_Update)
+        ds.SetMetadata({'TIFFTAG_DATETIME': dt.strftime('%Y:%m:%d %H:%M:%S')})
+        ds = None
+        self.meta['datetime'] = dt
 
     def remove_band(self, idx, out_filename):
         """Writes a new raster (in the specified output file) which is the same
