@@ -166,6 +166,8 @@ class Raster():
             gdal_dtype=ds.GetRasterBand(1).DataType)
         self.meta['transform'] = ds.GetGeoTransform(  # tuple
             can_return_null=True)
+        self.meta['block_size'] = tuple(ds.GetRasterBand(
+            1).GetBlockSize())                        # tuple
 
         # Read spatial reference as a osr.SpatialReference object or None
         # if there is no srs in metadata
