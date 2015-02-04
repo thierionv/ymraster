@@ -614,7 +614,7 @@ class Raster():
             img_seg.lsms_vectorisation(self, output_vector)
 
             print "vectorisation step has been realized succesfully"
-    
+
     def get_stat(self, orig_raster, out_filename, stats = 
                 ["mean","std","min","max","per"], percentile = [20,40,50,60,80]
                 , ext = "Gtiff"):
@@ -622,101 +622,16 @@ class Raster():
         statistics calculated by default are : mean, standard deviation, min,
         max and the 20, 40, 50, 60, 80th percentiles. The output is an image 
         at the given format that contains n_band * n_stat_features bands. This
-        method use the GDAL et NUMPY library.
+        method uses the GDAL et NUMPY library.
         
         :param orig_raster: The raster object on which the statistics are
                             calculated
         :param out_filename: Path of the output image.
         :param stats: List of the statistics to be calculated. By default, all
-                        the features are calculated, ie mean, std, min, max and
+                        the features are calculated,i.e. mean, std, min, max and
                         per.
-        :param percentile: List of the percentile to be calculated. By default,
-                            the percentiles are 20, 40, 50, 60, 80.
-        :param ext: format in wich the output image is written. Any formats
-                    supported by GDAL
-        """
-        
-        #load the image        
-        data = gdal.Open(orig_raster.filename)
-        
-        # Get some parameters
-        nx = data.RasterXSize
-        ny = data.RasterYSize
-        d = data.RasterCount
-        GeoTransform = data.GetGeoTransform()
-        Projection = data.GetProjection()
-        
-        #load the label file and sort his values
-        label = gdal.Open(self.filename)
-        L = label.GetRasterBand(1).ReadAsArray()
-        L_sorted = np.unique(L)
-        
-        #calcul the number of stats to be calculated per type (percentile or
-        #others)
-        if "per" in stats :
-            len_per = len(percentile) #number of percentiles
-            len_var = len(stats) - 1 #number of other stats
-        else :
-            len_per = 0
-            len_var = len(stats)
-        nb_var = len_per + len_var
-        d_obj = d * nb_var #number of band in the object
-        
-
-        # Initialization of the array that will received each band iteratively
-        im = np.empty((ny,nx))
-        
-        #Create the object file
-        driver= gdal.GetDriverByName(ext)
-        output = driver.Create(out_filename, nx, ny, d_obj, gdal.GDT_Float64)
-        output.SetGeoTransform(GeoTransform)
-        output.SetProjection(Projection)
-        
-        #Compute the object image
-        for j in range(d): #for each band
-            im = data.GetRasterBand(j+1).ReadAsArray()#load the band in a array
-            obj = np.empty((ny,nx))
-            for k in range(len_var):#for each stat which is not a percentile            
-                name = stats[k]                
-                for i in L_sorted:#for each label
-                    t = np.where(L==i)
-                    obj[t[0],t[1]] = getattr(im[t[0],t[1]], name)()    
-                temp = output.GetRasterBand(j * nb_var + k +1)
-                temp.WriteArray(obj[:,:])
-                temp.FlushCache()
-                
-            for l in range(len_per):#for each percentile
-                per = percentile[l]
-                for i in L_sorted:
-                    t = np.where(L==i)
-                    obj[t[0],t[1]] = np.percentile(im[t[0],t[1]], per)
-                k = l + len_var
-                temp = output.GetRasterBand(j * nb_var + k +1)
-                temp.WriteArray(obj[:,:])
-                temp.FlushCache()
-
-        ## Close the files    
-        label = None
-        data = None
-        output = None
-                
-    def get_stat2(self, orig_raster, out_filename, stats = 
-                ["mean","std","min","max","per"], percentile = [20,40,50,60,80]
-                , ext = "Gtiff"):
-        """Calcul statistics of the labels from a label image and raster. The
-        statistics calculated by default are : mean, standard deviation, min,
-        max and the 20, 40, 50, 60, 80th percentiles. The output is an image 
-        at the given format that contains n_band * n_stat_features bands. This
-        method use the GDAL et NUMPY library.
-        
-        :param orig_raster: The raster object on which the statistics are
-                            calculated
-        :param out_filename: Path of the output image.
-        :param stats: List of the statistics to be calculated. By default, all
-                        the features are calculated, ie mean, std, min, max and
-                        per.
-        :param percentile: List of the percentile to be calculated. By default,
-                            the percentiles are 20, 40, 50, 60, 80.
+            :param percentile: List of the percentile to be calculated. By default,
+                                the percentiles are 20, 40, 50, 60, 80.
         :param ext: Format in wich the output image is written. Any formats
                     supported by GDAL
         """
@@ -771,16 +686,15 @@ class Raster():
             for k in range(nb_var):#for each stat           
                 if k < len_var: #if this is not a percentile               
                     name = stats[k]
-                    for i in L_sorted:#for each label
-                        t = np.where(L==i)
-                        obj[t[0],t[1]] = fn[name](im[t[0],t[1]]) 
-                else:#if this is a percentile
+                    arg = [""]
+                else :
                     name = "per"
-                    arg = percentile[k - len_var]
-                    for i in L_sorted:#for each label
-                        t = np.where(L==i)
-                        obj[t[0],t[1]] = fn[name](im[t[0],t[1]],arg) 
-                       
+                    arg = ["",percentile[k - len_var]]
+                for i in L_sorted:#for each label
+                    t = np.where(L==i)
+                    arg[0] = im[t[0],t[1]]                     
+                    obj[t[0],t[1]] = fn[name](*arg) 
+                # Write the new band       
                 temp = output.GetRasterBand(j * nb_var + k +1)
                 temp.WriteArray(obj[:,:])
                 temp.FlushCache()
@@ -790,4 +704,3 @@ class Raster():
         label = None
         data = None
         output = None
-
