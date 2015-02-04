@@ -54,46 +54,80 @@ import os
 from tempfile import gettempdir
 
 
-def _save_array(array, out_filename, driver_name, dtype, proj=None,
-                geotransform=None, date=None):
-    """Write an NumPy array to an image file.
+def _write_file(out_filename, drivername=None, dtype=None, array=None,
+                width=None, height=None, depth=None, dt=None, srs=None,
+                transform=None, xoffset=0, yoffset=0):
+    """Writes an NumPy array to an image file.
 
-    :param array: the NumPy array to save
-    :param out_filename: path to the file to write in
-    :param meta: dict about the image (height, size, data type (int16,
-    float64, etc.), projection, ...)
+    If there is no array to save, just create an empty image file.
+
+    :param out_filename: path to the output file
+    :type out_filename: str
+    :param drivername: name of the driver to use. None means that the file
+                       already exists
+    :type drivername: str
+    :param dtype: datatype to use for the output file. None means that the file
+                  already exists
+    :type dtype: RasterDataType
+    :param array: the NumPy array to save. None means that an empty file will be
+                  created or, if file exists, that no data will be written
+                  (except metadata if specified)
+    :type array: np.ndarray
+    :param dt: date to write in the output file metadata
+    :type dt: datetime.datetime
+    :param srs: projection to write in the output file metadata
+    :type srs: osr.SpatialReference
+    :param transform: geo-transformation to use for the output file
+    :type transform: 6-tuple of floats
+    :param xoffset: horizontal offset. First index from which to write the array
+                    in the output file if the array is smaller (default: 0)
+    :type xoffset: float
+    :param yoffset: Vertical offset. First index from which to write the array
+                    in the output file if the array is smaller (default: 0)
+    :type yoffset: float
+
     """
-    # Get array size
-    if array.ndim >= 4:
-        raise NotImplementedError('Do not support 4+-dimensional arrays')
-    if array.ndim == 3:
+    # Size of output image
+    if width is not None and height is not None and depth is not None:
+        xsize, ysize, number_bands = width, height, depth
+    elif array.ndim == 3:
         ysize, xsize, number_bands = array.shape
     else:
         ysize, xsize = array.shape
         number_bands = 1
 
-    # Create an empty raster of correct size
-    driver = gdal.GetDriverByName(driver_name)
-    out_raster = driver.Create(out_filename,
+    # Create an empty raster if it does not exists and set metadata
+    try:
+        out_ds = gdal.Open(out_filename, gdal.GA_Update)
+    except RuntimeError:
+        driver = gdal.GetDriverByName(drivername)
+        out_ds = driver.Create(out_filename,
                                xsize,
                                ysize,
                                number_bands,
                                dtype.gdal_dtype)
-    if proj is not None:
-        out_raster.SetProjection(proj)
-    if geotransform is not None:
-        out_raster.SetGeoTransform(geotransform)
+    if dt is not None:
+        out_ds.SetMetadata(
+            {'TIFFTAG_DATETIME': dt.strftime('%Y:%m:%d %H:%M:%S')})
+    if srs is not None:
+        out_ds.SetProjection(srs.ExportToWkt())
+    if transform is not None:
+        out_ds.SetGeoTransform(transform)
+
+    # Save array if there is an array to save
+    if array is None:
+        return
     if number_bands == 1:
-        band = out_raster.GetRasterBand(1)
-        band.WriteArray(array)
+        band = out_ds.GetRasterBand(1)
+        band.WriteArray(array, xoff=xoffset, yoff=yoffset)
         band.FlushCache()
     else:
         for i in range(number_bands):
-            band = out_raster.GetRasterBand(i+1)
-            band.WriteArray(array[:, :, i])
+            band = out_ds.GetRasterBand(i+1)
+            band.WriteArray(array[:, :, i], xoff=xoffset, yoff=yoffset)
             band.FlushCache()
-    out_raster = None
     band = None
+    out_ds = None
 
 
 def concatenate_images(rasters, out_filename):
@@ -140,6 +174,69 @@ def concatenate_images(rasters, out_filename):
     if same_type:
         ConcatenateImages.SetParameterOutputImagePixelType("out", otb_dtype)
     ConcatenateImages.ExecuteAndWriteOutput()
+
+
+def temporal_stats(rasters, out_filename, drivername, idx_band=1):
+    """Compute pixel statistics from a given list of temporally distinct, but
+    spatially identical, rasters.
+
+    Only one band in each image is considered (by default: the first one).
+
+    Output is a multi-band image where each band contains a statistic (eg.
+    maximum, mean). For summary statistics (eg. maximum), there is an additional
+    band which gives the date/time at which the result has been found, in
+    numeric format (eg. maximum has occured on Apr 25, 2013 (midnight) ->
+    1366840800.0)
+
+    :param rasters: list of rasters to compute statistics from
+    :type rasters: list of ``Raster`` instances
+    :param idx_band: index of the band to compute statistics on
+    :type idx_band: int
+    :param out_filename: path to the output file
+    :type out_filename: str
+    """
+    # Create an empty file based on what is to be computed
+    raster0 = rasters[0]
+    _write_file(out_filename,
+                drivername=drivername,
+                dtype=dtype.RasterDataType(lstr_dtype='float64'),
+                width=raster0.meta['width'],
+                height=raster0.meta['height'],
+                depth=4,
+                dt=raster0.meta['datetime'],
+                srs=raster0.meta['srs'],
+                transform=raster0.meta['transform'],
+                )
+
+    # TODO: improve to find better "natural" blocks than using the "natural"
+    # segmentation of simply the first image
+    block_wins = raster0.block_windows()
+
+    for block_win in block_wins:
+        # Turn each block into an array and concatenate them into a array stack
+        arrays = [raster.array(idx_band, block_win) for raster in rasters]
+        stack = np.dstack(arrays)
+
+        # Compute the max for each pixel in the stack and also the date when
+        # each max occurs. Put the result into two arrays
+        hsize, vsize = block_win[2], block_win[3]
+        array_max = np.empty((vsize, hsize))
+        np.nanmax(stack, axis=2, out=array_max)
+        array_max_date = np.argmax(stack, axis=2)
+
+        # Compute the min for each pixel in the stack and also the date when
+        # each min occurs. Put the result into two arrays
+        array_min = np.empty((vsize, hsize))
+        np.nanmin(stack, axis=2, out=array_min)
+        array_min_date = np.argmin(stack, axis=2)
+
+        # Concatenate all the results into a new array and write it to the file
+        stats = np.dstack((array_max,
+                           array_max_date,
+                           array_min,
+                           array_min_date))
+        xoffset, yoffset = block_win[0], block_win[1]
+        _write_file(out_filename, array=stats, xoffset=xoffset, yoffset=yoffset)
 
 
 class Raster():
@@ -200,11 +297,10 @@ class Raster():
         # Close file
         ds = None
 
-    def blocks(self, block_size=None):
-        """Returns a list of blocks of the given size for the raster.
+    def block_windows(self, block_size=None):
+        """Returns a list of block windows of the given size for the raster.
 
-        It takes care of adjusting the size for blocks at right and bottom of
-        the raster.
+        It takes care of adjusting the size at right and bottom of the raster.
 
         :param block_size: wanted size for the blocks (defaults to the "natural"
                            block size of the raster
@@ -217,7 +313,7 @@ class Raster():
             else self.meta['block_size']
 
         # Compute the list
-        block_list = []
+        win_list = []
         for i in range(0, self.meta['height'], ysize):
             # Block height is ysize except at the bottom of the raster
             number_rows = ysize \
@@ -228,23 +324,49 @@ class Raster():
                 number_cols = xsize \
                     if j + ysize < self.meta['width'] \
                     else self.meta['width'] - j
-                block_list.append((j, i, number_cols, number_rows))
-        return block_list
+                win_list.append((j, i, number_cols, number_rows))
+        return win_list
 
-    def array(self):
+    def array(self, idx_band=None, block_win=None):
         """Returns the NumPy array corresponding to the raster.
 
-        :rtype: numpy.ndarray"""
+        If the idx_band parameter is specified, then returns the NumPy array
+        corresponding only to the band in the raster which has the given index.
+
+        If the block_win parameter is specified, then returns the NumPy array
+        corresponding to the block in the raster at the given window.
+
+        :param idx_band: index of a band in the raster
+        :type idx_band: int
+        :param block_win: block window in the raster (x, y, hsize, vsize)
+        :type block_win: 4-tuple of int
+        :rtype: numpy.ndarray
+        """
+        # TODO: improve to support slice and range number of bands
+        # Array size
+        (hsize, vsize) = (block_win[2], block_win[3]) \
+            if block_win is not None \
+            else (self.meta['width'], self.meta['height'])
+        depth = 1 if idx_band is not None else self.meta['count']
+
         # Initialize an empty array of correct size and type
-        array = np.empty((self.meta['height'],
-                          self.meta['width'],
-                          self.meta['count']),
-                         dtype=self.meta['dtype'].numpy_dtype)
+        if depth != 1:
+            array = np.empty((vsize, hsize, depth),
+                             dtype=self.meta['dtype'].numpy_dtype)
 
         # Fill the array
         ds = gdal.Open(self.filename, gdal.GA_ReadOnly)
-        for i in range(self.meta['count']):
-            array[:, :, i] = ds.GetRasterBand(i+1).ReadAsArray()
+        for array_i in range(depth):
+            ds_i = idx_band if idx_band is not None else array_i + 1
+            if idx_band is not None and block_win is not None:
+                array = ds.GetRasterBand(ds_i).ReadAsArray(*block_win)
+            elif idx_band is not None and block_win is None:
+                array = ds.GetRasterBand(ds_i).ReadAsArray()
+            elif idx_band is None and block_win is not None:
+                array[:, :, array_i] = ds.GetRasterBand(ds_i).ReadAsArray(
+                    *block_win)
+            else:
+                array[:, :, array_i] = ds.GetRasterBand(ds_i).ReadAsArray()
         ds = None
 
         return array
@@ -358,6 +480,10 @@ class Raster():
         RadiometricIndices.SetParameterString("out", out_filename)
         RadiometricIndices.ExecuteAndWriteOutput()
 
+        out_raster = Raster(out_filename)
+        if self.meta['datetime'] is not None:
+            out_raster.set_datetime(self.meta['datetime'])
+
         return Raster(out_filename)
 
     @fix_missing_proj
@@ -381,6 +507,10 @@ class Raster():
         RadiometricIndices.SetParameterStringList("list", ["Water:NDWI"])
         RadiometricIndices.SetParameterString("out", out_filename)
         RadiometricIndices.ExecuteAndWriteOutput()
+
+        out_raster = Raster(out_filename)
+        if self.meta['datetime'] is not None:
+            out_raster.set_datetime(self.meta['datetime'])
 
         return Raster(out_filename)
 
@@ -407,6 +537,10 @@ class Raster():
         RadiometricIndices.SetParameterStringList("list", ["Water:MNDWI"])
         RadiometricIndices.SetParameterString("out", out_filename)
         RadiometricIndices.ExecuteAndWriteOutput()
+
+        out_raster = Raster(out_filename)
+        if self.meta['datetime'] is not None:
+            out_raster.set_datetime(self.meta['datetime'])
 
         return Raster(out_filename)
 
