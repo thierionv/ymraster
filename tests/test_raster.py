@@ -4,7 +4,7 @@ import unittest
 import doctest
 import tempfile
 
-from ymraster import _write_file, concatenate_images, Raster
+from ymraster import write_file, concatenate_images, Raster
 from ymraster.dtype import RasterDataType
 from osgeo import gdal, ogr, osr
 import numpy as np
@@ -16,7 +16,7 @@ from datetime import datetime
 import subprocess
 
 
-def _write_file_unique_value(filename,
+def write_file_unique_value(filename,
                              width,
                              height,
                              number_bands,
@@ -26,7 +26,7 @@ def _write_file_unique_value(filename,
                     dtype=dtype.numpy_dtype) * value \
         if number_bands > 1 \
         else np.ones((height, width), dtype=dtype.numpy_dtype) * value
-    _write_file(filename, drivername='GTiff', dtype=dtype, array=array)
+    write_file(filename, drivername='GTiff', dtype=dtype, array=array)
 
 
 def _check_output_image(tester,
@@ -65,14 +65,14 @@ def _check_output_image(tester,
 
 class TestArrayToRaster(unittest.TestCase):
 
-    def test_write_file_one_band_square_uint16_image(self):
+    def testwrite_file_one_band_square_uint16_image(self):
         width = 200
         height = 200
         number_bands = 1
         dtype = RasterDataType(numpy_dtype=np.uint16)
         value = 65535
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
-        _write_file_unique_value(out_file.name,
+        write_file_unique_value(out_file.name,
                                  width,
                                  height,
                                  number_bands,
@@ -90,14 +90,14 @@ class TestArrayToRaster(unittest.TestCase):
                             mean=value,
                             stddev=0)
 
-    def test_write_file_three_band_square_uint16_image(self):
+    def testwrite_file_three_band_square_uint16_image(self):
         width = 400
         height = 400
         number_bands = 3
         dtype = RasterDataType(numpy_dtype=np.uint16)
         value = 65535
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
-        _write_file_unique_value(out_file.name,
+        write_file_unique_value(out_file.name,
                                  width,
                                  height,
                                  number_bands,
@@ -115,14 +115,14 @@ class TestArrayToRaster(unittest.TestCase):
                             mean=value,
                             stddev=0)
 
-    def test_write_file_three_band_rectangle_uint16_image(self):
+    def testwrite_file_three_band_rectangle_uint16_image(self):
         width = 800
         height = 600
         number_bands = 3
         dtype = RasterDataType(numpy_dtype=np.uint16)
         value = 65535
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
-        _write_file_unique_value(out_file.name,
+        write_file_unique_value(out_file.name,
                                  width,
                                  height,
                                  number_bands,
@@ -140,7 +140,7 @@ class TestArrayToRaster(unittest.TestCase):
                             mean=value,
                             stddev=0)
 
-    def test_write_file_should_raise_value_error_if_value_out_of_range(self):
+    def testwrite_file_should_raise_value_error_if_value_out_of_range(self):
         width = 3
         height = 3
         number_bands = 1
@@ -149,10 +149,10 @@ class TestArrayToRaster(unittest.TestCase):
         a = np.ones((height, width, number_bands),
                     dtype=dtype.numpy_dtype) * value
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
-        self.assertRaises(ValueError, _write_file, out_file.name,
+        self.assertRaises(ValueError, write_file, out_file.name,
                           drivername='GTiff', dtype=dtype, array=a)
 
-    def test_write_file_should_raise_not_implemented_if_four_dimensional(self):
+    def testwrite_file_should_raise_not_implemented_if_four_dimensional(self):
         width = 3
         height = 3
         number_bands = 3
@@ -161,7 +161,7 @@ class TestArrayToRaster(unittest.TestCase):
         a = np.ones((height, width, number_bands, 1),
                     dtype=dtype.numpy_dtype) * value
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
-        self.assertRaises(ValueError, _write_file, out_file.name,
+        self.assertRaises(ValueError, write_file, out_file.name,
                           drivername='GTiff', dtype=dtype, array=a)
 
     def tearDown(self):

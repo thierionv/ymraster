@@ -56,7 +56,7 @@ import os
 from tempfile import gettempdir
 
 
-def _write_file(out_filename, overwrite=False, drivername=None, dtype=None,
+def write_file(out_filename, overwrite=False, drivername=None, dtype=None,
                 array=None, width=None, height=None, depth=None, dt=None,
                 srs=None, transform=None, xoffset=0, yoffset=0):
     """Writes an NumPy array to an image file.
@@ -209,7 +209,7 @@ def temporal_stats(rasters, out_filename, drivername, idx_band=1,
 
     # Create an empty file based on what is to be computed
     raster0 = rasters[0]
-    _write_file(out_filename,
+    write_file(out_filename,
                 overwrite=True,
                 drivername=drivername,
                 dtype=dtype.RasterDataType(lstr_dtype='float64'),
@@ -242,7 +242,7 @@ def temporal_stats(rasters, out_filename, drivername, idx_band=1,
         # Concatenate results into a stack and save the block to the output file
         stat_stack = np.dstack(stat_list)
         xoffset, yoffset = block_win[0], block_win[1]
-        _write_file(out_filename, array=stat_stack,
+        write_file(out_filename, array=stat_stack,
                     xoffset=xoffset, yoffset=yoffset)
 
 
@@ -855,13 +855,13 @@ class Raster():
         output = driver.Create(out_filename, nx, ny, d_obj, gdal.GDT_Float64)
         output.SetGeoTransform(GeoTransform)
         output.SetProjection(Projection)
-        
+
         #Compute the object image
         for j in range(d): #for each band
             im = data.GetRasterBand(j+1).ReadAsArray()#load the band in a array
-            for k in range(nb_var):#for each stat           
-                obj = np.empty((ny,nx))                
-                if k < len_var: #if this is not a percentile               
+            for k in range(nb_var):#for each stat
+                obj = np.empty((ny,nx))
+                if k < len_var: #if this is not a percentile
                     name = stats[k]
                     arg = [""]
                 else:
