@@ -682,8 +682,8 @@ class Raster():
         #Compute the object image
         for j in range(d): #for each band
             im = data.GetRasterBand(j+1).ReadAsArray()#load the band in a array
-            obj = np.empty((ny,nx))
             for k in range(nb_var):#for each stat           
+                obj = np.empty((ny,nx))                
                 if k < len_var: #if this is not a percentile               
                     name = stats[k]
                     arg = [""]
