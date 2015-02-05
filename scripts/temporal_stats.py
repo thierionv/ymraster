@@ -16,6 +16,12 @@ def valid_date(s):
         raise argparse.ArgumentTypeError(msg)
 
 
+def date2float(dt, dt0):
+    """Returns number of days between the two given datetime objects."""
+    delta = dt - dt0
+    return delta.days
+
+
 def compute_temporal_stats():
     # Command-line parameters
     parser = argparse.ArgumentParser(
