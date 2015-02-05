@@ -177,8 +177,8 @@ def concatenate_images(rasters, out_filename):
 
 
 def temporal_stats(rasters, out_filename, drivername, idx_band=1):
-    """Compute pixel statistics from a given list of temporally distinct, but
-    spatially identical, rasters.
+    """Compute pixel-wise statistics from a given list of multitemporal,
+    but spatially identical, rasters.
 
     Only one band in each image is considered (by default: the first one).
 
