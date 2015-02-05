@@ -46,23 +46,27 @@ except ImportError as e:
     raise ImportError(
         str(e) + "\n\nPlease install NumPy.")
 import dtype
+import array_stat
 
 from fix_proj_decorator import fix_missing_proj
 
 from datetime import datetime
+from time import mktime
 import os
 from tempfile import gettempdir
 
 
-def _write_file(out_filename, drivername=None, dtype=None, array=None,
-                width=None, height=None, depth=None, dt=None, srs=None,
-                transform=None, xoffset=0, yoffset=0):
+def _write_file(out_filename, overwrite=False, drivername=None, dtype=None,
+                array=None, width=None, height=None, depth=None, dt=None,
+                srs=None, transform=None, xoffset=0, yoffset=0):
     """Writes an NumPy array to an image file.
 
     If there is no array to save, just create an empty image file.
 
     :param out_filename: path to the output file
     :type out_filename: str
+    :param overwrite: if True, overwrite file if exists. False by default.
+    :type overwrite: bool
     :param drivername: name of the driver to use. None means that the file
                        already exists
     :type drivername: str
@@ -98,8 +102,9 @@ def _write_file(out_filename, drivername=None, dtype=None, array=None,
 
     # Create an empty raster if it does not exists and set metadata
     try:
+        assert not overwrite
         out_ds = gdal.Open(out_filename, gdal.GA_Update)
-    except RuntimeError:
+    except (AssertionError, RuntimeError):
         driver = gdal.GetDriverByName(drivername)
         out_ds = driver.Create(out_filename,
                                xsize,
@@ -176,13 +181,14 @@ def concatenate_images(rasters, out_filename):
     ConcatenateImages.ExecuteAndWriteOutput()
 
 
-def temporal_stats(rasters, out_filename, drivername, idx_band=1):
+def temporal_stats(rasters, out_filename, drivername, idx_band=1,
+                   stats=['min', 'max']):
     """Compute pixel-wise statistics from a given list of multitemporal,
     but spatially identical, rasters.
 
     Only one band in each image is considered (by default: the first one).
 
-    Output is a multi-band image where each band contains a statistic (eg.
+    Output is a multi-band raster where each band contains a statistic (eg.
     maximum, mean). For summary statistics (eg. maximum), there is an additional
     band which gives the date/time at which the result has been found, in
     numeric format (eg. maximum has occured on Apr 25, 2013 (midnight) ->
@@ -194,10 +200,13 @@ def temporal_stats(rasters, out_filename, drivername, idx_band=1):
     :type idx_band: int
     :param out_filename: path to the output file
     :type out_filename: str
+    :param stats: list of stats to compute
+    :type stats: list of str
     """
     # Create an empty file based on what is to be computed
     raster0 = rasters[0]
     _write_file(out_filename,
+                overwrite=True,
                 drivername=drivername,
                 dtype=dtype.RasterDataType(lstr_dtype='float64'),
                 width=raster0.meta['width'],
@@ -213,30 +222,26 @@ def temporal_stats(rasters, out_filename, drivername, idx_band=1):
     block_wins = raster0.block_windows()
 
     for block_win in block_wins:
-        # Turn each block into an array and concatenate them into a array stack
-        arrays = [raster.array(idx_band, block_win) for raster in rasters]
-        stack = np.dstack(arrays)
+        # Turn each block into an array and concatenate them into a stack
+        block_arrays = [raster.array(idx_band, block_win) for raster in rasters]
+        block_stack = np.dstack(block_arrays)
 
-        # Compute the max for each pixel in the stack and also the date when
-        # each max occurs. Put the result into two arrays
-        hsize, vsize = block_win[2], block_win[3]
-        array_max = np.empty((vsize, hsize))
-        np.nanmax(stack, axis=2, out=array_max)
-        array_max_date = np.argmax(stack, axis=2)
+        # Compute each stat for the block and append the result to a list
+        stat_list = []
+        for stat in stats:
+            astat = array_stat.ArrayStat(stat, axis=2)
+            stat_list.append(astat.compute(block_stack))
+            if astat.is_summary:  # If summary stat, compute date of occurence
+                date_array = astat.indices(block_stack)
+                for x in np.nditer(date_array, op_flags=['readwrite']):
+                    x[...] = mktime(rasters[x].meta['datetime'].timetuple())
+                stat_list.append(date_array)
 
-        # Compute the min for each pixel in the stack and also the date when
-        # each min occurs. Put the result into two arrays
-        array_min = np.empty((vsize, hsize))
-        np.nanmin(stack, axis=2, out=array_min)
-        array_min_date = np.argmin(stack, axis=2)
-
-        # Concatenate all the results into a new array and write it to the file
-        stats = np.dstack((array_max,
-                           array_max_date,
-                           array_min,
-                           array_min_date))
+        # Concatenate results into a stack and save the block to the output file
+        stat_stack = np.dstack(stat_list)
         xoffset, yoffset = block_win[0], block_win[1]
-        _write_file(out_filename, array=stats, xoffset=xoffset, yoffset=yoffset)
+        _write_file(out_filename, array=stat_stack,
+                    xoffset=xoffset, yoffset=yoffset)
 
 
 class Raster():
@@ -358,11 +363,11 @@ class Raster():
         ds = gdal.Open(self.filename, gdal.GA_ReadOnly)
         for array_i in range(depth):
             ds_i = idx_band if idx_band is not None else array_i + 1
-            if idx_band is not None and block_win is not None:
+            if depth == 1 and block_win is not None:
                 array = ds.GetRasterBand(ds_i).ReadAsArray(*block_win)
-            elif idx_band is not None and block_win is None:
+            elif depth == 1 and block_win is None:
                 array = ds.GetRasterBand(ds_i).ReadAsArray()
-            elif idx_band is None and block_win is not None:
+            elif depth != 1 and block_win is not None:
                 array[:, :, array_i] = ds.GetRasterBand(ds_i).ReadAsArray(
                     *block_win)
             else:
