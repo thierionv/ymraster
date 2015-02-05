@@ -46,54 +46,93 @@ except ImportError as e:
     raise ImportError(
         str(e) + "\n\nPlease install NumPy.")
 import dtype
+import array_stat
 
 from fix_proj_decorator import fix_missing_proj
 
 from datetime import datetime
+from time import mktime
 import os
 from tempfile import gettempdir
 
 
-def _save_array(array, out_filename, driver_name, dtype, proj=None,
-                geotransform=None, date=None):
-    """Write an NumPy array to an image file.
+def _write_file(out_filename, overwrite=False, drivername=None, dtype=None,
+                array=None, width=None, height=None, depth=None, dt=None,
+                srs=None, transform=None, xoffset=0, yoffset=0):
+    """Writes an NumPy array to an image file.
 
-    :param array: the NumPy array to save
-    :param out_filename: path to the file to write in
-    :param meta: dict about the image (height, size, data type (int16,
-    float64, etc.), projection, ...)
+    If there is no array to save, just create an empty image file.
+
+    :param out_filename: path to the output file
+    :type out_filename: str
+    :param overwrite: if True, overwrite file if exists. False by default.
+    :type overwrite: bool
+    :param drivername: name of the driver to use. None means that the file
+                       already exists
+    :type drivername: str
+    :param dtype: datatype to use for the output file. None means that the file
+                  already exists
+    :type dtype: RasterDataType
+    :param array: the NumPy array to save. None means that an empty file will be
+                  created or, if file exists, that no data will be written
+                  (except metadata if specified)
+    :type array: np.ndarray
+    :param dt: date to write in the output file metadata
+    :type dt: datetime.datetime
+    :param srs: projection to write in the output file metadata
+    :type srs: osr.SpatialReference
+    :param transform: geo-transformation to use for the output file
+    :type transform: 6-tuple of floats
+    :param xoffset: horizontal offset. First index from which to write the array
+                    in the output file if the array is smaller (default: 0)
+    :type xoffset: float
+    :param yoffset: Vertical offset. First index from which to write the array
+                    in the output file if the array is smaller (default: 0)
+    :type yoffset: float
+
     """
-    # Get array size
-    if array.ndim >= 4:
-        raise NotImplementedError('Do not support 4+-dimensional arrays')
-    if array.ndim == 3:
+    # Size of output image
+    if width is not None and height is not None and depth is not None:
+        xsize, ysize, number_bands = width, height, depth
+    elif array.ndim == 3:
         ysize, xsize, number_bands = array.shape
     else:
         ysize, xsize = array.shape
         number_bands = 1
 
-    # Create an empty raster of correct size
-    driver = gdal.GetDriverByName(driver_name)
-    out_raster = driver.Create(out_filename,
+    # Create an empty raster if it does not exists and set metadata
+    try:
+        assert not overwrite
+        out_ds = gdal.Open(out_filename, gdal.GA_Update)
+    except (AssertionError, RuntimeError):
+        driver = gdal.GetDriverByName(drivername)
+        out_ds = driver.Create(out_filename,
                                xsize,
                                ysize,
                                number_bands,
                                dtype.gdal_dtype)
-    if proj is not None:
-        out_raster.SetProjection(proj)
-    if geotransform is not None:
-        out_raster.SetGeoTransform(geotransform)
+    if dt is not None:
+        out_ds.SetMetadata(
+            {'TIFFTAG_DATETIME': dt.strftime('%Y:%m:%d %H:%M:%S')})
+    if srs is not None:
+        out_ds.SetProjection(srs.ExportToWkt())
+    if transform is not None:
+        out_ds.SetGeoTransform(transform)
+
+    # Save array if there is an array to save
+    if array is None:
+        return
     if number_bands == 1:
-        band = out_raster.GetRasterBand(1)
-        band.WriteArray(array)
+        band = out_ds.GetRasterBand(1)
+        band.WriteArray(array, xoff=xoffset, yoff=yoffset)
         band.FlushCache()
     else:
         for i in range(number_bands):
-            band = out_raster.GetRasterBand(i+1)
-            band.WriteArray(array[:, :, i])
+            band = out_ds.GetRasterBand(i+1)
+            band.WriteArray(array[:, :, i], xoff=xoffset, yoff=yoffset)
             band.FlushCache()
-    out_raster = None
     band = None
+    out_ds = None
 
 
 def concatenate_images(rasters, out_filename):
@@ -142,6 +181,71 @@ def concatenate_images(rasters, out_filename):
     ConcatenateImages.ExecuteAndWriteOutput()
 
 
+def temporal_stats(rasters, out_filename, drivername, idx_band=1,
+                   stats=['min', 'max']):
+    """Compute pixel-wise statistics from a given list of multitemporal,
+    but spatially identical, rasters.
+
+    Only one band in each image is considered (by default: the first one).
+
+    Output is a multi-band raster where each band contains a statistic (eg.
+    maximum, mean). For summary statistics (eg. maximum), there is an additional
+    band which gives the date/time at which the result has been found, in
+    numeric format (eg. maximum has occured on Apr 25, 2013 (midnight) ->
+    1366840800.0)
+
+    :param rasters: list of rasters to compute statistics from
+    :type rasters: list of ``Raster`` instances
+    :param idx_band: index of the band to compute statistics on
+    :type idx_band: int
+    :param out_filename: path to the output file
+    :type out_filename: str
+    :param stats: list of stats to compute
+    :type stats: list of str
+    """
+    # Number of bands in output file
+    depth = len(stats) + len([stat for stat in stats
+                              if array_stat.ArrayStat(stat).is_summary])
+
+    # Create an empty file based on what is to be computed
+    raster0 = rasters[0]
+    _write_file(out_filename,
+                overwrite=True,
+                drivername=drivername,
+                dtype=dtype.RasterDataType(lstr_dtype='float64'),
+                width=raster0.meta['width'],
+                height=raster0.meta['height'],
+                depth=depth,
+                srs=raster0.meta['srs'],
+                transform=raster0.meta['transform'])
+
+    # TODO: improve to find better "natural" blocks than using the "natural"
+    # segmentation of simply the first image
+    block_wins = raster0.block_windows()
+
+    for block_win in block_wins:
+        # Turn each block into an array and concatenate them into a stack
+        block_arrays = [raster.array(idx_band, block_win) for raster in rasters]
+        block_stack = np.dstack(block_arrays)
+
+        # Compute each stat for the block and append the result to a list
+        stat_list = []
+        for stat in stats:
+            astat = array_stat.ArrayStat(stat, axis=2)
+            stat_list.append(astat.compute(block_stack))
+            if astat.is_summary:  # If summary stat, compute date of occurence
+                date_array = astat.indices(block_stack)
+                for x in np.nditer(date_array, op_flags=['readwrite']):
+                    x[...] = mktime(rasters[x].meta['datetime'].timetuple())
+                stat_list.append(date_array)
+
+        # Concatenate results into a stack and save the block to the output file
+        stat_stack = np.dstack(stat_list)
+        xoffset, yoffset = block_win[0], block_win[1]
+        _write_file(out_filename, array=stat_stack,
+                    xoffset=xoffset, yoffset=yoffset)
+
+
 class Raster():
     """Represents a raster image that was read from a file.
 
@@ -165,13 +269,15 @@ class Raster():
         ds = gdal.Open(self.filename, gdal.GA_ReadOnly)
         self.meta = {}
         self.meta['driver'] = ds.GetDriver()            # gdal.Driver object
-        self.meta['count'] = ds.RasterCount             # int
         self.meta['width'] = ds.RasterXSize             # int
         self.meta['height'] = ds.RasterYSize            # int
-        self.meta['dtype'] = dtype.RasterDataType(      # RasterDataType object
-            gdal_dtype=ds.GetRasterBand(1).DataType)
-        try:
-            self.meta['datetime'] = datetime.strptime(  # datetime object
+        self.meta['count'] = ds.RasterCount             # int
+        self.meta['dtype'] = dtype.RasterDataType(
+            gdal_dtype=ds.GetRasterBand(1).DataType)    # RasterDataType object
+        self.meta['block_size'] = tuple(
+            ds.GetRasterBand(1).GetBlockSize())         # tuple
+        try:                                            # datetime object
+            self.meta['datetime'] = datetime.strptime(
                 ds.GetMetadataItem('TIFFTAG_DATETIME'), '%Y:%m:%d %H:%M:%S')
         except ValueError:  # string has wrong datetime format
             self.meta['datetime'] = None
@@ -198,20 +304,76 @@ class Raster():
         # Close file
         ds = None
 
-    def array(self):
+    def block_windows(self, block_size=None):
+        """Returns a list of block windows of the given size for the raster.
+
+        It takes care of adjusting the size at right and bottom of the raster.
+
+        :param block_size: wanted size for the blocks (defaults to the "natural"
+                           block size of the raster
+        :type block_size: tuple (xsize, ysize)
+        :rtype: list of tuples in the form (i, j, xsize, ysize)
+        """
+        # Default size for blocks
+        xsize, ysize = block_size \
+            if block_size is not None \
+            else self.meta['block_size']
+
+        # Compute the list
+        win_list = []
+        for i in range(0, self.meta['height'], ysize):
+            # Block height is ysize except at the bottom of the raster
+            number_rows = ysize \
+                if i + ysize < self.meta['height'] \
+                else self.meta['height'] - i
+            for j in range(0, self.meta['width'], xsize):
+                # Block width is xsize except at the right of the raster
+                number_cols = xsize \
+                    if j + ysize < self.meta['width'] \
+                    else self.meta['width'] - j
+                win_list.append((j, i, number_cols, number_rows))
+        return win_list
+
+    def array(self, idx_band=None, block_win=None):
         """Returns the NumPy array corresponding to the raster.
 
-        :rtype: numpy.ndarray"""
+        If the idx_band parameter is specified, then returns the NumPy array
+        corresponding only to the band in the raster which has the given index.
+
+        If the block_win parameter is specified, then returns the NumPy array
+        corresponding to the block in the raster at the given window.
+
+        :param idx_band: index of a band in the raster
+        :type idx_band: int
+        :param block_win: block window in the raster (x, y, hsize, vsize)
+        :type block_win: 4-tuple of int
+        :rtype: numpy.ndarray
+        """
+        # TODO: improve to support slice and range number of bands
+        # Array size
+        (hsize, vsize) = (block_win[2], block_win[3]) \
+            if block_win is not None \
+            else (self.meta['width'], self.meta['height'])
+        depth = 1 if idx_band is not None else self.meta['count']
+
         # Initialize an empty array of correct size and type
-        array = np.empty((self.meta['height'],
-                          self.meta['width'],
-                          self.meta['count']),
-                         dtype=self.meta['dtype'].numpy_dtype)
+        if depth != 1:
+            array = np.empty((vsize, hsize, depth),
+                             dtype=self.meta['dtype'].numpy_dtype)
 
         # Fill the array
         ds = gdal.Open(self.filename, gdal.GA_ReadOnly)
-        for i in range(self.meta['count']):
-            array[:, :, i] = ds.GetRasterBand(i+1).ReadAsArray()
+        for array_i in range(depth):
+            ds_i = idx_band if idx_band is not None else array_i + 1
+            if depth == 1 and block_win is not None:
+                array = ds.GetRasterBand(ds_i).ReadAsArray(*block_win)
+            elif depth == 1 and block_win is None:
+                array = ds.GetRasterBand(ds_i).ReadAsArray()
+            elif depth != 1 and block_win is not None:
+                array[:, :, array_i] = ds.GetRasterBand(ds_i).ReadAsArray(
+                    *block_win)
+            else:
+                array[:, :, array_i] = ds.GetRasterBand(ds_i).ReadAsArray()
         ds = None
 
         return array
@@ -325,6 +487,10 @@ class Raster():
         RadiometricIndices.SetParameterString("out", out_filename)
         RadiometricIndices.ExecuteAndWriteOutput()
 
+        out_raster = Raster(out_filename)
+        if self.meta['datetime'] is not None:
+            out_raster.set_datetime(self.meta['datetime'])
+
         return Raster(out_filename)
 
     @fix_missing_proj
@@ -348,6 +514,10 @@ class Raster():
         RadiometricIndices.SetParameterStringList("list", ["Water:NDWI"])
         RadiometricIndices.SetParameterString("out", out_filename)
         RadiometricIndices.ExecuteAndWriteOutput()
+
+        out_raster = Raster(out_filename)
+        if self.meta['datetime'] is not None:
+            out_raster.set_datetime(self.meta['datetime'])
 
         return Raster(out_filename)
 
@@ -374,6 +544,10 @@ class Raster():
         RadiometricIndices.SetParameterStringList("list", ["Water:MNDWI"])
         RadiometricIndices.SetParameterString("out", out_filename)
         RadiometricIndices.ExecuteAndWriteOutput()
+
+        out_raster = Raster(out_filename)
+        if self.meta['datetime'] is not None:
+            out_raster.set_datetime(self.meta['datetime'])
 
         return Raster(out_filename)
 
@@ -615,66 +789,69 @@ class Raster():
 
             print "vectorisation step has been realized succesfully"
 
-    def get_stat(self, orig_raster, out_filename, stats = 
-                ["mean","std","min","max","per"], percentile = [20,40,50,60,80]
-                , ext = "Gtiff"):
+    def get_stat(self,
+                 orig_raster,
+                 out_filename,
+                 stats=["mean", "std", "min", "max", "per"],
+                 percentile=[20, 40, 50, 60, 80],
+                 ext="Gtiff"):
         """Calcul statistics of the labels from a label image and raster. The
         statistics calculated by default are : mean, standard deviation, min,
-        max and the 20, 40, 50, 60, 80th percentiles. The output is an image 
+        max and the 20, 40, 50, 60, 80th percentiles. The output is an image
         at the given format that contains n_band * n_stat_features bands. This
         method uses the GDAL et NUMPY library.
-        
+
         :param orig_raster: The raster object on which the statistics are
                             calculated
         :param out_filename: Path of the output image.
         :param stats: List of the statistics to be calculated. By default, all
-                        the features are calculated,i.e. mean, std, min, max and
-                        per.
-            :param percentile: List of the percentile to be calculated. By default,
-                                the percentiles are 20, 40, 50, 60, 80.
+                      the features are calculated,i.e. mean, std, min, max and
+                      per.
+        :param percentile: List of the percentile to be calculated. By
+                           default, the percentiles are 20, 40, 50, 60, 80.
         :param ext: Format in wich the output image is written. Any formats
                     supported by GDAL
         """
-        
-        #load the image        
+
+        # load the image
         data = gdal.Open(orig_raster.filename)
-        
+
         # Get some parameters
         nx = data.RasterXSize
         ny = data.RasterYSize
         d = data.RasterCount
         GeoTransform = data.GetGeoTransform()
         Projection = data.GetProjection()
-        
-        #load the label file and sort his values
+
+        # load the label file and sort his values
         label = gdal.Open(self.filename)
         L = label.GetRasterBand(1).ReadAsArray()
         L_sorted = np.unique(L)
-        
-        #calcul the number of stats to be calculated per type (percentile or
-        #others)
-        if "per" in stats :
-            len_per = len(percentile) #number of percentiles
-            len_var = len(stats) - 1 #number of other stats
-        else :
+
+        # calcul the number of stats to be calculated per type (percentile or
+        # others)
+        if "per" in stats:
+            len_per = len(percentile)  # number of percentiles
+            len_var = len(stats) - 1   # number of other stats
+        else:
             len_per = 0
             len_var = len(stats)
         nb_var = len_per + len_var
-        d_obj = d * nb_var #number of band in the object
-        
-        #creation of a function dictionnary
-        fn = {}        
-        fn["mean"] = np.mean        
+        d_obj = d * nb_var  # number of band in the object
+
+        # creation of a function dictionnary
+        fn = {}
+        fn["mean"] = np.mean
         fn["std"] = np.std
-        fn["min"] = np.min 
-        fn["max"] = np.max 
-        fn["per"] = np.percentile 
-        
+        fn["min"] = np.min
+        fn["max"] = np.max
+        fn["per"] = np.percentile
+
         # Initialization of the array that will received each band iteratively
-        im = np.empty((ny,nx))
-        
-        #Create the object file
-        driver= gdal.GetDriverByName(ext)
+        im = np.empty((ny, nx))
+
+        # Create the object file
+        driver = gdal.GetDriverByName(ext)
         output = driver.Create(out_filename, nx, ny, d_obj, gdal.GDT_Float64)
         output.SetGeoTransform(GeoTransform)
         output.SetProjection(Projection)
@@ -687,20 +864,19 @@ class Raster():
                 if k < len_var: #if this is not a percentile               
                     name = stats[k]
                     arg = [""]
-                else :
+                else:
                     name = "per"
-                    arg = ["",percentile[k - len_var]]
-                for i in L_sorted:#for each label
-                    t = np.where(L==i)
-                    arg[0] = im[t[0],t[1]]                     
-                    obj[t[0],t[1]] = fn[name](*arg) 
-                # Write the new band       
-                temp = output.GetRasterBand(j * nb_var + k +1)
-                temp.WriteArray(obj[:,:])
+                    arg = ["", percentile[k - len_var]]
+                for i in L_sorted:  # for each label
+                    t = np.where(L == i)
+                    arg[0] = im[t[0], t[1]]
+                    obj[t[0], t[1]] = fn[name](*arg)
+                # Write the new band
+                temp = output.GetRasterBand(j * nb_var + k + 1)
+                temp.WriteArray(obj[:, :])
                 temp.FlushCache()
-                
 
-        ## Close the files    
+        # Close the files
         label = None
         data = None
         output = None

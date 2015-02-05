@@ -3,28 +3,42 @@
 import argparse
 from ymraster import Raster
 
+import os.path
+import string
 
-def compute_ndvi():
+
+def compute_mndwi():
     # Command-line parameters
     parser = argparse.ArgumentParser(
-        description="Compute Modified Normalized Difference Water Index (MNDWI)"
-        " of the input image and save it into the specified output file. "
-        "Indices of green and middle-infrared bands must be given "
-        "(indices start at 1).")
-    parser.add_argument("-i", "--in_file", help="Path to the input image",
-                        required=True)
-    parser.add_argument("-red", "--idx_red", help="Index of the red band",
-                        type=int, required=True)
-    parser.add_argument("-nir", "--idx_nir", help="Index of the near-infrared "
-                        "band", type=int, required=True)
-    parser.add_argument("-o", "--out_file", help="Path to the output file",
-                        type=int, required=True)
+        description="Compute "
+        "Modified Normalized Difference Water Index (MNDwI) "
+        "also called Normalized Difference Snow Index (NDSI) "
+        "of all the given images (green and mid-infrared band must be at same "
+        "position) and save it into the specified output file.")
+    parser.add_argument("in_list", nargs='+',
+                        help="Path to the input image")
+    parser.add_argument("-g", "--idx_green", type=int, required=True,
+                        help="Index of green band in all input images")
+    parser.add_argument("-mir", "--idx_mir", type=int, required=True,
+                        help="Index of mid-infrared band in all input images")
+    parser.add_argument("-o", "--out_file",
+                        help="Path to the output file. Default is "
+                        "'${basename}.mndwi.tif' in the current folder. "
+                        "${basename} is the input filename without extension. "
+                        "If you specify more than one images, you really "
+                        "should use ${basename}.")
     args = parser.parse_args()
 
     # Do the actual work
-    raster = Raster(args.in_file)
-    raster.ndvi(args.out_file, args.idx_red, args.idx_nir)
+    for filename in args.in_list:
+        raster = Raster(filename)
+        if args.out_file is None:
+            out_filename = string.Template(
+                "${basename}.mndwi.tif").substitute(
+                    {'basename':
+                     os.path.basename(os.path.splitext(filename)[0])})
+            raster.mndwi(out_filename, args.idx_green, args.idx_mir)
 
 
 if __name__ == "__main__":
-    compute_ndvi()
+    compute_mndwi()
