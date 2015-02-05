@@ -10,6 +10,7 @@ _STATS = [
     'mean',
     'std',
     'median',
+    'range',
     'quartile1',
     'quartile3',
     'percentile',
@@ -25,6 +26,7 @@ _STAT_FUNC['max'] = np.nanmax
 _STAT_FUNC['mean'] = np.nanmean
 _STAT_FUNC['std'] = np.nanstd
 _STAT_FUNC['median'] = np.median
+_STAT_FUNC['range'] = np.ptp
 
 _COMMON_PERCENTILES = {
     'quartile1': 25,
