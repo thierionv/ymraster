@@ -56,6 +56,16 @@ import os
 from tempfile import gettempdir
 
 
+def _dt2float(dt):
+    """Returns a float corresponding to the given datetime object.
+
+    :param dt: datetime to convert into a float
+    :type dt: datetime.datetime
+    :rtype: float
+    """
+    return mktime(dt.timetuple())
+
+
 def write_file(out_filename, overwrite=False, drivername=None, dtype=None,
                array=None, width=None, height=None, depth=None, dt=None,
                srs=None, transform=None, xoffset=0, yoffset=0):
@@ -182,7 +192,7 @@ def concatenate_images(rasters, out_filename):
 
 
 def temporal_stats(rasters, out_filename, drivername, idx_band=1,
-                   stats=['min', 'max']):
+                   stats=['min', 'max'], date_func=_dt2float):
     """Compute pixel-wise statistics from a given list of multitemporal,
     but spatially identical, rasters.
 
@@ -202,6 +212,11 @@ def temporal_stats(rasters, out_filename, drivername, idx_band=1,
     :type out_filename: str
     :param stats: list of stats to compute
     :type stats: list of str
+    :param stats: list of stats to compute
+    :type stats: list of str
+    :param date_func: function which returns a float from a datetime object.
+                      By default, it is the time.mktime() function
+    :type date_func: function
     """
     # Number of bands in output file
     depth = len(stats) + len([stat for stat in stats
@@ -238,7 +253,7 @@ def temporal_stats(rasters, out_filename, drivername, idx_band=1,
             if astat.is_summary:  # If summary stat, compute date of occurence
                 date_array = astat.indices(block_stack)
                 for x in np.nditer(date_array, op_flags=['readwrite']):
-                    x[...] = mktime(rasters[x].meta['datetime'].timetuple())
+                    x[...] = date_func(rasters[x].meta['datetime'])
                 stat_array_list.append(date_array)
 
         # Concatenate results into a stack and save the block to the output file
