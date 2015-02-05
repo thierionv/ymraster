@@ -192,7 +192,7 @@ def concatenate_images(rasters, out_filename):
 
 
 def temporal_stats(rasters, out_filename, drivername, idx_band=1,
-                   stats=['min', 'max'], date_func=_dt2float):
+                   stats=['min', 'max'], date2float=_dt2float):
     """Compute pixel-wise statistics from a given list of multitemporal,
     but spatially identical, rasters.
 
@@ -201,7 +201,8 @@ def temporal_stats(rasters, out_filename, drivername, idx_band=1,
     Output is a multi-band raster where each band contains a statistic (eg.
     maximum, mean). For summary statistics (eg. maximum), there is an additional
     band which gives the date/time at which the result has been found, in
-    numeric format (eg. maximum has occured on Apr 25, 2013 (midnight) ->
+    numeric format as a result of the given date2float function (by default
+    converts a date into seconds since 1970, eg. Apr 25, 2013 (midnight) ->
     1366840800.0)
 
     :param rasters: list of rasters to compute statistics from
@@ -214,9 +215,9 @@ def temporal_stats(rasters, out_filename, drivername, idx_band=1,
     :type stats: list of str
     :param stats: list of stats to compute
     :type stats: list of str
-    :param date_func: function which returns a float from a datetime object.
-                      By default, it is the time.mktime() function
-    :type date_func: function
+    :param date2float: function which returns a float from a datetime object.
+                       By default, it is the time.mktime() function
+    :type date2float: function
     """
     # Number of bands in output file
     depth = len(stats) + len([stat for stat in stats
@@ -253,7 +254,7 @@ def temporal_stats(rasters, out_filename, drivername, idx_band=1,
             if astat.is_summary:  # If summary stat, compute date of occurence
                 date_array = astat.indices(block_stack)
                 for x in np.nditer(date_array, op_flags=['readwrite']):
-                    x[...] = date_func(rasters[x].meta['datetime'])
+                    x[...] = date2float(rasters[x].meta['datetime'])
                 stat_array_list.append(date_array)
 
         # Concatenate results into a stack and save the block to the output file
