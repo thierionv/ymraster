@@ -216,10 +216,8 @@ def temporal_stats(rasters, out_filename, drivername, idx_band=1,
                 width=raster0.meta['width'],
                 height=raster0.meta['height'],
                 depth=depth,
-                dt=raster0.meta['datetime'],
                 srs=raster0.meta['srs'],
-                transform=raster0.meta['transform'],
-                )
+                transform=raster0.meta['transform'])
 
     # TODO: improve to find better "natural" blocks than using the "natural"
     # segmentation of simply the first image
