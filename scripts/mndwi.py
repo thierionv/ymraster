@@ -37,7 +37,7 @@ def compute_mndwi():
                 "${basename}.mndwi.tif").substitute(
                     {'basename':
                      os.path.basename(os.path.splitext(filename)[0])})
-            raster.mndwi(out_filename, args.idx_red, args.idx_nir)
+            raster.mndwi(out_filename, args.idx_green, args.idx_mir)
 
 
 if __name__ == "__main__":
