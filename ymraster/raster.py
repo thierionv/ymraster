@@ -203,6 +203,10 @@ def temporal_stats(rasters, out_filename, drivername, idx_band=1,
     :param stats: list of stats to compute
     :type stats: list of str
     """
+    # Number of bands in output file
+    depth = len(stats) + len([stat for stat in stats
+                              if array_stat.ArrayStat(stat).is_summary])
+
     # Create an empty file based on what is to be computed
     raster0 = rasters[0]
     _write_file(out_filename,
@@ -211,7 +215,7 @@ def temporal_stats(rasters, out_filename, drivername, idx_band=1,
                 dtype=dtype.RasterDataType(lstr_dtype='float64'),
                 width=raster0.meta['width'],
                 height=raster0.meta['height'],
-                depth=4,
+                depth=depth,
                 dt=raster0.meta['datetime'],
                 srs=raster0.meta['srs'],
                 transform=raster0.meta['transform'],
