@@ -57,8 +57,8 @@ from tempfile import gettempdir
 
 
 def write_file(out_filename, overwrite=False, drivername=None, dtype=None,
-                array=None, width=None, height=None, depth=None, dt=None,
-                srs=None, transform=None, xoffset=0, yoffset=0):
+               array=None, width=None, height=None, depth=None, dt=None,
+               srs=None, transform=None, xoffset=0, yoffset=0):
     """Writes an NumPy array to an image file.
 
     If there is no array to save, just create an empty image file.
@@ -210,14 +210,14 @@ def temporal_stats(rasters, out_filename, drivername, idx_band=1,
     # Create an empty file based on what is to be computed
     raster0 = rasters[0]
     write_file(out_filename,
-                overwrite=True,
-                drivername=drivername,
-                dtype=dtype.RasterDataType(lstr_dtype='float64'),
-                width=raster0.meta['width'],
-                height=raster0.meta['height'],
-                depth=depth,
-                srs=raster0.meta['srs'],
-                transform=raster0.meta['transform'])
+               overwrite=True,
+               drivername=drivername,
+               dtype=dtype.RasterDataType(lstr_dtype='float64'),
+               width=raster0.meta['width'],
+               height=raster0.meta['height'],
+               depth=depth,
+               srs=raster0.meta['srs'],
+               transform=raster0.meta['transform'])
 
     # TODO: improve to find better "natural" blocks than using the "natural"
     # segmentation of simply the first image
@@ -226,24 +226,28 @@ def temporal_stats(rasters, out_filename, drivername, idx_band=1,
     for block_win in block_wins:
         # Turn each block into an array and concatenate them into a stack
         block_arrays = [raster.array(idx_band, block_win) for raster in rasters]
-        block_stack = np.dstack(block_arrays)
+        block_stack = np.dstack(block_arrays) \
+            if len(block_arrays) > 1 \
+            else block_arrays[0]
 
         # Compute each stat for the block and append the result to a list
-        stat_list = []
+        stat_array_list = []
         for stat in stats:
             astat = array_stat.ArrayStat(stat, axis=2)
-            stat_list.append(astat.compute(block_stack))
+            stat_array_list.append(astat.compute(block_stack))
             if astat.is_summary:  # If summary stat, compute date of occurence
                 date_array = astat.indices(block_stack)
                 for x in np.nditer(date_array, op_flags=['readwrite']):
                     x[...] = mktime(rasters[x].meta['datetime'].timetuple())
-                stat_list.append(date_array)
+                stat_array_list.append(date_array)
 
         # Concatenate results into a stack and save the block to the output file
-        stat_stack = np.dstack(stat_list)
+        stat_stack = np.dstack(stat_array_list) \
+            if len(stat_array_list) > 1 \
+            else stat_array_list[0]
         xoffset, yoffset = block_win[0], block_win[1]
         write_file(out_filename, array=stat_stack,
-                    xoffset=xoffset, yoffset=yoffset)
+                   xoffset=xoffset, yoffset=yoffset)
 
 
 class Raster():
