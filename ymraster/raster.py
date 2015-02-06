@@ -567,6 +567,22 @@ class Raster():
         list_ = [self] + rasters
         concatenate_images(list_, out_filename)
         return Raster(out_filename)
+    
+    def apply_mask(self, mask_raster, mask_value, out_filename):
+        """
+        """
+        rasters = [self.filename, mask_raster.filename] 
+        
+        d = self.count                
+        BandMath = otb.Registry.CreateApplication("BandMath")
+        
+        for i in range(d):
+            exp = "im1b1 = ((im2b1 == -9999) ? 999999 : im1b1)"
+        BandMath.SetParameterStringList("il", rasters)
+        BandMath.SetParameterString("out", "data/test_set_mask.tif") 
+        BandMath.SetParameterString("exp", exp) 
+        BandMath.ExecuteAndWriteOutput()        
+        
 
     def lsms_smoothing(self, out_smoothed_filename, spatialr, ranger,
                        out_spatial_filename, thres=0.1, rangeramp=0,
@@ -813,9 +829,12 @@ class Raster():
                     supported by GDAL
         """
 
-        # load the image
+        # load thes images
         data = gdal.Open(orig_raster.filename)
-
+        #TODO : remove the following lines if necessary
+        #mask = gdal.Open(mask_raster.filename)
+        #M = mask.GetRasterBand(1).ReadAsArray()
+        
         # Get some parameters
         nx = data.RasterXSize
         ny = data.RasterYSize
@@ -868,9 +887,10 @@ class Raster():
                     name = "per"
                     arg = ["", percentile[k - len_var]]
                 for i in L_sorted:  # for each label
-                    t = np.where(L == i)
-                    arg[0] = im[t[0], t[1]]
-                    obj[t[0], t[1]] = fn[name](*arg)
+                    t = np.where((L == i))
+                    if t[0].any(): #if t is not empty
+                        arg[0] = im[t[0], t[1]]
+                        obj[t[0], t[1]] = fn[name](*arg)
                 # Write the new band
                 temp = output.GetRasterBand(j * nb_var + k + 1)
                 temp.WriteArray(obj[:, :])
