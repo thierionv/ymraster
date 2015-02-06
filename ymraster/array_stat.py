@@ -10,6 +10,7 @@ _STATS = [
     'mean',
     'std',
     'median',
+    'range',
     'quartile1',
     'quartile3',
     'percentile',
@@ -25,6 +26,7 @@ _STAT_FUNC['max'] = np.nanmax
 _STAT_FUNC['mean'] = np.nanmean
 _STAT_FUNC['std'] = np.nanstd
 _STAT_FUNC['median'] = np.median
+_STAT_FUNC['range'] = np.ptp
 
 _COMMON_PERCENTILES = {
     'quartile1': 25,
@@ -35,14 +37,14 @@ _COMMON_PERCENTILES = {
 class ArrayStat(object):
     """Represent a stat that is computable on a NumPy array"""
 
-    def __init__(self, s, percentage=None, axis=None):
-        if s not in _STATS:
+    def __init__(self, s, axis=None):
+        self.stat = s if ':' not in s else s.split(':')[0]
+        if self.stat not in _STATS:
             raise ValueError("Not a recognized statistic: {}".format(s))
-        self.stat = s
+        self.percentage = None if ':' not in s else float(s.split(':')[1])
         self.func = _STAT_FUNC[s]
         self.is_summary = s in _SUMMARY_STAT_FUNC
         self.summary_func = _SUMMARY_STAT_FUNC[s] if self.is_summary else None
-        self.percentage = percentage
         if self.func is np.percentile and self.percentage is None:
             try:
                 self.percentage = _COMMON_PERCENTILES[s]

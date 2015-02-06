@@ -56,12 +56,32 @@ import os
 from tempfile import gettempdir
 
 
-def _write_file(out_filename, overwrite=False, drivername=None, dtype=None,
-                array=None, width=None, height=None, depth=None, dt=None,
-                srs=None, transform=None, xoffset=0, yoffset=0):
-    """Writes an NumPy array to an image file.
+def _dt2float(dt):
+    """Returns a float corresponding to the given datetime object.
 
-    If there is no array to save, just create an empty image file.
+    :param dt: datetime to convert into a float
+    :type dt: datetime.datetime
+    :rtype: float
+    """
+    return mktime(dt.timetuple())
+
+
+def write_file(out_filename, overwrite=False, drivername=None, dtype=None,
+               array=None, width=None, height=None, depth=None, dt=None,
+               srs=None, transform=None, xoffset=0, yoffset=0):
+    """Writes a NumPy array to an image file.
+
+    If there is no array (array is None), the function simply create an empty
+    image file of given size (width, height, depth). In other words, if array is
+    None, width, height and depth must be specified.
+
+    If array is not None, then all other parameters are optional: if the file
+    exists, array will be written into the file. If the file does not exists, a
+    new file will be created with same size and type than the array.
+
+    This allows to write a file block by block. First create an empty file of
+    correct size and type. Then write each block into the file using the xoffset
+    and yoffset parameters.
 
     :param out_filename: path to the output file
     :type out_filename: str
@@ -77,7 +97,13 @@ def _write_file(out_filename, overwrite=False, drivername=None, dtype=None,
                   created or, if file exists, that no data will be written
                   (except metadata if specified)
     :type array: np.ndarray
-    :param dt: date to write in the output file metadata
+    :param width: horizontal size of the image to be created
+    :type width: int
+    :param height: vertical size of the image to be created
+    :type width: int
+    :param depth: number of bands of the image to be created
+    :type depth: int
+    :param dt: date/time to write in the output file metadata
     :type dt: datetime.datetime
     :param srs: projection to write in the output file metadata
     :type srs: osr.SpatialReference
@@ -91,16 +117,17 @@ def _write_file(out_filename, overwrite=False, drivername=None, dtype=None,
     :type yoffset: float
 
     """
-    # Size of output image
-    if width is not None and height is not None and depth is not None:
-        xsize, ysize, number_bands = width, height, depth
-    elif array.ndim == 3:
-        ysize, xsize, number_bands = array.shape
-    else:
-        ysize, xsize = array.shape
+    # Size & data type of output image
+    xsize, ysize = (width, height) \
+        if width and height \
+        else (array.shape[1], array.shape[0])
+    try:
+        number_bands = depth if depth else array.shape[2]
+    except IndexError:
         number_bands = 1
+    datatype = dtype if dtype else dtype.RasterDataType(numpy_dtype=array.dtype)
 
-    # Create an empty raster if it does not exists and set metadata
+    # Create an empty raster file if it does not exists or if overwrite is True
     try:
         assert not overwrite
         out_ds = gdal.Open(out_filename, gdal.GA_Update)
@@ -110,13 +137,15 @@ def _write_file(out_filename, overwrite=False, drivername=None, dtype=None,
                                xsize,
                                ysize,
                                number_bands,
-                               dtype.gdal_dtype)
-    if dt is not None:
+                               datatype.gdal_dtype)
+
+    # Set metadata
+    if dt:
         out_ds.SetMetadata(
             {'TIFFTAG_DATETIME': dt.strftime('%Y:%m:%d %H:%M:%S')})
-    if srs is not None:
+    if srs:
         out_ds.SetProjection(srs.ExportToWkt())
-    if transform is not None:
+    if transform:
         out_ds.SetGeoTransform(transform)
 
     # Save array if there is an array to save
@@ -182,26 +211,32 @@ def concatenate_images(rasters, out_filename):
 
 
 def temporal_stats(rasters, out_filename, drivername, idx_band=1,
-                   stats=['min', 'max']):
-    """Compute pixel-wise statistics from a given list of multitemporal,
+                   stats=['min', 'max'], date2float=_dt2float):
+    """Compute pixel-wise statistics from a given list of temporally distinct,
     but spatially identical, rasters.
 
-    Only one band in each image is considered (by default: the first one).
+    Only one band in each raster is considered (by default: the first one).
 
     Output is a multi-band raster where each band contains a statistic (eg.
-    maximum, mean). For summary statistics (eg. maximum), there is an additional
+    max, mean). For summary statistics (eg. maximum), there is an additional
     band which gives the date/time at which the result has been found, in
-    numeric format (eg. maximum has occured on Apr 25, 2013 (midnight) ->
+    numeric format, as a result of the given date2float function (by default
+    converts a date into seconds since 1970, eg. Apr 25, 2013 (midnight) ->
     1366840800.0)
 
     :param rasters: list of rasters to compute statistics from
     :type rasters: list of ``Raster`` instances
-    :param idx_band: index of the band to compute statistics on
-    :type idx_band: int
     :param out_filename: path to the output file
     :type out_filename: str
+    :param drivername: driver to use for writing the output file
+    :type drivername: str
+    :param idx_band: index of the band to compute statistics on (default: 1)
+    :type idx_band: int
     :param stats: list of stats to compute
     :type stats: list of str
+    :param date2float: function which returns a float from a datetime object.
+                       By default, it is the time.mktime() function
+    :type date2float: function
     """
     # Number of bands in output file
     depth = len(stats) + len([stat for stat in stats
@@ -209,15 +244,15 @@ def temporal_stats(rasters, out_filename, drivername, idx_band=1,
 
     # Create an empty file based on what is to be computed
     raster0 = rasters[0]
-    _write_file(out_filename,
-                overwrite=True,
-                drivername=drivername,
-                dtype=dtype.RasterDataType(lstr_dtype='float64'),
-                width=raster0.meta['width'],
-                height=raster0.meta['height'],
-                depth=depth,
-                srs=raster0.meta['srs'],
-                transform=raster0.meta['transform'])
+    write_file(out_filename,
+               overwrite=True,
+               drivername=drivername,
+               dtype=dtype.RasterDataType(lstr_dtype='float64'),
+               width=raster0.meta['width'],
+               height=raster0.meta['height'],
+               depth=depth,
+               srs=raster0.meta['srs'],
+               transform=raster0.meta['transform'])
 
     # TODO: improve to find better "natural" blocks than using the "natural"
     # segmentation of simply the first image
@@ -226,24 +261,28 @@ def temporal_stats(rasters, out_filename, drivername, idx_band=1,
     for block_win in block_wins:
         # Turn each block into an array and concatenate them into a stack
         block_arrays = [raster.array(idx_band, block_win) for raster in rasters]
-        block_stack = np.dstack(block_arrays)
+        block_stack = np.dstack(block_arrays) \
+            if len(block_arrays) > 1 \
+            else block_arrays[0]
 
         # Compute each stat for the block and append the result to a list
-        stat_list = []
+        stat_array_list = []
         for stat in stats:
             astat = array_stat.ArrayStat(stat, axis=2)
-            stat_list.append(astat.compute(block_stack))
+            stat_array_list.append(astat.compute(block_stack))
             if astat.is_summary:  # If summary stat, compute date of occurence
                 date_array = astat.indices(block_stack)
                 for x in np.nditer(date_array, op_flags=['readwrite']):
-                    x[...] = mktime(rasters[x].meta['datetime'].timetuple())
-                stat_list.append(date_array)
+                    x[...] = date2float(rasters[x].meta['datetime'])
+                stat_array_list.append(date_array)
 
         # Concatenate results into a stack and save the block to the output file
-        stat_stack = np.dstack(stat_list)
+        stat_stack = np.dstack(stat_array_list) \
+            if len(stat_array_list) > 1 \
+            else stat_array_list[0]
         xoffset, yoffset = block_win[0], block_win[1]
-        _write_file(out_filename, array=stat_stack,
-                    xoffset=xoffset, yoffset=yoffset)
+        write_file(out_filename, array=stat_stack,
+                   xoffset=xoffset, yoffset=yoffset)
 
 
 class Raster():
@@ -901,13 +940,13 @@ class Raster():
         output = driver.Create(out_filename, nx, ny, d_obj, gdal.GDT_Float64)
         output.SetGeoTransform(GeoTransform)
         output.SetProjection(Projection)
-        
+
         #Compute the object image
         for j in range(d): #for each band
             im = data.GetRasterBand(j+1).ReadAsArray()#load the band in a array
-            for k in range(nb_var):#for each stat           
-                obj = np.empty((ny,nx))                
-                if k < len_var: #if this is not a percentile               
+            for k in range(nb_var):#for each stat
+                obj = np.empty((ny,nx))
+                if k < len_var: #if this is not a percentile
                     name = stats[k]
                     arg = [""]
                 else:
