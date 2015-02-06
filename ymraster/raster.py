@@ -69,9 +69,19 @@ def _dt2float(dt):
 def write_file(out_filename, overwrite=False, drivername=None, dtype=None,
                array=None, width=None, height=None, depth=None, dt=None,
                srs=None, transform=None, xoffset=0, yoffset=0):
-    """Writes an NumPy array to an image file.
+    """Writes a NumPy array to an image file.
 
-    If there is no array to save, just create an empty image file.
+    If there is no array (array is None), the function simply create an empty
+    image file of given size (width, height, depth). In other words, if array is
+    None, width, height and depth must be specified.
+
+    If array is not None, then all other parameters are optional: if the file
+    exists, array will be written into the file. If the file does not exists, a
+    new file will be created with same size and type than the array.
+
+    This allows to write a file block by block. First create an empty file of
+    correct size and type. Then write each block into the file using the xoffset
+    and yoffset parameters.
 
     :param out_filename: path to the output file
     :type out_filename: str
@@ -87,7 +97,13 @@ def write_file(out_filename, overwrite=False, drivername=None, dtype=None,
                   created or, if file exists, that no data will be written
                   (except metadata if specified)
     :type array: np.ndarray
-    :param dt: date to write in the output file metadata
+    :param width: horizontal size of the image to be created
+    :type width: int
+    :param height: vertical size of the image to be created
+    :type width: int
+    :param depth: number of bands of the image to be created
+    :type depth: int
+    :param dt: date/time to write in the output file metadata
     :type dt: datetime.datetime
     :param srs: projection to write in the output file metadata
     :type srs: osr.SpatialReference
