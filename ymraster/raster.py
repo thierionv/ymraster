@@ -568,20 +568,33 @@ class Raster():
         concatenate_images(list_, out_filename)
         return Raster(out_filename)
     
-    def apply_mask(self, mask_raster, mask_value, out_filename):
+    def apply_mask(self, mask_raster, in_mask_value, out_filename,
+                   out_mask_value = 65636):
         """
         """
         rasters = [self.filename, mask_raster.filename] 
         
-        d = self.count                
+        d = self.meta['count']
+                
         BandMath = otb.Registry.CreateApplication("BandMath")
-        
+        list_raster = []
+        list_file  = []
         for i in range(d):
-            exp = "im1b1 = ((im2b1 == -9999) ? 999999 : im1b1)"
-        BandMath.SetParameterStringList("il", rasters)
-        BandMath.SetParameterString("out", "data/test_set_mask.tif") 
-        BandMath.SetParameterString("exp", exp) 
-        BandMath.ExecuteAndWriteOutput()        
+            exp = "(im2b1 == {}) ? {} : im1b{}".format(in_mask_value,
+                                                        out_mask_value,i+1)
+            out = os.path.join(gettempdir(),'mono_mask_{}.tif'.format(i))
+            BandMath.SetParameterStringList("il", rasters)
+            BandMath.SetParameterString("out", out) 
+            BandMath.SetParameterString("exp", exp) 
+            BandMath.ExecuteAndWriteOutput()
+            list_raster.append(Raster(out)) 
+            list_file.append(out)
+        
+        
+        concatenate_images(list_raster, out_filename)
+        
+        for fi in list_file:
+            os.remove(fi)
         
 
     def lsms_smoothing(self, out_smoothed_filename, spatialr, ranger,
