@@ -117,16 +117,17 @@ def write_file(out_filename, overwrite=False, drivername=None, dtype=None,
     :type yoffset: float
 
     """
-    # Size of output image
-    if width is not None and height is not None and depth is not None:
-        xsize, ysize, number_bands = width, height, depth
-    elif array.ndim == 3:
-        ysize, xsize, number_bands = array.shape
-    else:
-        ysize, xsize = array.shape
+    # Size & data type of output image
+    xsize, ysize = (width, height) \
+        if width and height \
+        else (array.shape[1], array.shape[0])
+    try:
+        number_bands = depth if depth else array.shape[2]
+    except IndexError:
         number_bands = 1
+    datatype = dtype if dtype else dtype.RasterDataType(numpy_dtype=array.dtype)
 
-    # Create an empty raster if it does not exists and set metadata
+    # Create an empty raster file if it does not exists or if overwrite is True
     try:
         assert not overwrite
         out_ds = gdal.Open(out_filename, gdal.GA_Update)
@@ -136,13 +137,15 @@ def write_file(out_filename, overwrite=False, drivername=None, dtype=None,
                                xsize,
                                ysize,
                                number_bands,
-                               dtype.gdal_dtype)
-    if dt is not None:
+                               datatype.gdal_dtype)
+
+    # Set metadata
+    if dt:
         out_ds.SetMetadata(
             {'TIFFTAG_DATETIME': dt.strftime('%Y:%m:%d %H:%M:%S')})
-    if srs is not None:
+    if srs:
         out_ds.SetProjection(srs.ExportToWkt())
-    if transform is not None:
+    if transform:
         out_ds.SetGeoTransform(transform)
 
     # Save array if there is an array to save
