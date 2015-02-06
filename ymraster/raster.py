@@ -209,26 +209,26 @@ def concatenate_images(rasters, out_filename):
 
 def temporal_stats(rasters, out_filename, drivername, idx_band=1,
                    stats=['min', 'max'], date2float=_dt2float):
-    """Compute pixel-wise statistics from a given list of multitemporal,
+    """Compute pixel-wise statistics from a given list of temporally distinct,
     but spatially identical, rasters.
 
-    Only one band in each image is considered (by default: the first one).
+    Only one band in each raster is considered (by default: the first one).
 
     Output is a multi-band raster where each band contains a statistic (eg.
-    maximum, mean). For summary statistics (eg. maximum), there is an additional
+    max, mean). For summary statistics (eg. maximum), there is an additional
     band which gives the date/time at which the result has been found, in
-    numeric format as a result of the given date2float function (by default
+    numeric format, as a result of the given date2float function (by default
     converts a date into seconds since 1970, eg. Apr 25, 2013 (midnight) ->
     1366840800.0)
 
     :param rasters: list of rasters to compute statistics from
     :type rasters: list of ``Raster`` instances
-    :param idx_band: index of the band to compute statistics on
-    :type idx_band: int
     :param out_filename: path to the output file
     :type out_filename: str
-    :param stats: list of stats to compute
-    :type stats: list of str
+    :param drivername: driver to use for writing the output file
+    :type drivername: str
+    :param idx_band: index of the band to compute statistics on (default: 1)
+    :type idx_band: int
     :param stats: list of stats to compute
     :type stats: list of str
     :param date2float: function which returns a float from a datetime object.
