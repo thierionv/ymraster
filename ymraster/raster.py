@@ -570,29 +570,43 @@ class Raster():
     
     def apply_mask(self, mask_raster, in_mask_value, out_filename,
                    out_mask_value = 65636):
-        """
-        """
-        rasters = [self.filename, mask_raster.filename] 
+        """Apply a mask to an image. It could be a multi-band image.
         
+        :param mask_raster: the raster object of the mask to apply
+        :param in_mask_value: the value of the pixels "masked" in mask_raster
+        :param out_filename: path of the output file
+        :param out_mask_value: the value to set to the pixels masked in the
+                            output file
+        """
+        
+        #get the number of bands
         d = self.meta['count']
-                
-        BandMath = otb.Registry.CreateApplication("BandMath")
+        
+        #initialize variables
         list_raster = []
         list_file  = []
+        rasters = [self.filename, mask_raster.filename] 
+        BandMath = otb.Registry.CreateApplication("BandMath")
+        
+        #for each band, apply the mask and create a file
         for i in range(d):
+            #conditional expression to set a new value to the input band
             exp = "(im2b1 == {}) ? {} : im1b{}".format(in_mask_value,
                                                         out_mask_value,i+1)
+                                                        
             out = os.path.join(gettempdir(),'mono_mask_{}.tif'.format(i))
             BandMath.SetParameterStringList("il", rasters)
             BandMath.SetParameterString("out", out) 
             BandMath.SetParameterString("exp", exp) 
             BandMath.ExecuteAndWriteOutput()
+            #store the temp files path and corresponding raster objects
             list_raster.append(Raster(out)) 
             list_file.append(out)
         
-        
+        #Concatenate each mono-band file in one
         concatenate_images(list_raster, out_filename)
         
+        #Delete the temp files
         for fi in list_file:
             os.remove(fi)
         
