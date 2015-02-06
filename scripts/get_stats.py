@@ -24,7 +24,7 @@ if __name__ == "__main__":
                         ,required = True)
     parser.add_argument("--ms_file","-ms", help="Path of the multi spectral" +
                         " image on wich the statistics are calculated"
-                        ,required = True)
+                        ,required = True)        
     parser.add_argument("-out", "--out_file", help ="Name of the output file",
                         required = True, type = str)
     parser.add_argument("-d","--dir", default = "", help = "Path of the " +
