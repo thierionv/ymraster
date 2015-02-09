@@ -24,10 +24,10 @@ if __name__ == "__main__":
                         " not to hide", required = True)
     parser.add_argument("--in_mask_value", "-inv",  help="The value of the " +
                         "pixels masked in mask raster. The default value is "+
-                        "-9999", type = int)
+                        "-9999", type = int, default = -9999)
     parser.add_argument("--out_mask_value", "-outv",  help="The value to set "+
                         "to the pixels masked in the output file. The default"+
-                        " value is 65636", type = int)
+                        " value is 65636", type = int, default = 65636)
     parser.add_argument("-out", "--out_file", help ="Name of the output file",
                         required = True, type = str)
     parser.add_argument("-d","--dir", default = "", help = "Path of the " +
