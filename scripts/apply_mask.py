@@ -42,8 +42,9 @@ if __name__ == "__main__":
     out_filename = os.path.join(args.dir, args.out_file)
     
     #Execution of the method
-    img_to_mask.apply_mask( mask_img, args.in_mask_value , out_filename,
-                   out_mask_value = args.out_mask_value)
+    masked_img = img_to_mask.apply_mask( mask_img, args.in_mask_value ,
+                                        out_filename,
+                                        out_mask_value = args.out_mask_value)
     
     print "The mask has been applied succesfully"
     
