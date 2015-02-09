@@ -45,7 +45,7 @@ try:
 except ImportError as e:
     raise ImportError(
         str(e) + "\n\nPlease install NumPy.")
-import dtype
+import dtype as data_type
 import array_stat
 
 from fix_proj_decorator import fix_missing_proj
@@ -125,7 +125,9 @@ def write_file(out_filename, overwrite=False, drivername=None, dtype=None,
         number_bands = depth if depth else array.shape[2]
     except IndexError:
         number_bands = 1
-    datatype = dtype if dtype else dtype.RasterDataType(numpy_dtype=array.dtype)
+    datatype = dtype \
+        if dtype \
+        else data_type.RasterDataType(numpy_dtype=array.dtype)
 
     # Create an empty raster file if it does not exists or if overwrite is True
     try:
@@ -137,7 +139,7 @@ def write_file(out_filename, overwrite=False, drivername=None, dtype=None,
                                xsize,
                                ysize,
                                number_bands,
-                               datatype.gdal_dtype)
+                               data_type.gdal_dtype)
 
     # Set metadata
     if dt:
@@ -247,7 +249,7 @@ def temporal_stats(rasters, out_filename, drivername, idx_band=1,
     write_file(out_filename,
                overwrite=True,
                drivername=drivername,
-               dtype=dtype.RasterDataType(lstr_dtype='float64'),
+               dtype=data_type.RasterDataType(lstr_dtype='float64'),
                width=raster0.meta['width'],
                height=raster0.meta['height'],
                depth=depth,
@@ -311,7 +313,7 @@ class Raster():
         self.meta['width'] = ds.RasterXSize             # int
         self.meta['height'] = ds.RasterYSize            # int
         self.meta['count'] = ds.RasterCount             # int
-        self.meta['dtype'] = dtype.RasterDataType(
+        self.meta['dtype'] = data_type.RasterDataType(
             gdal_dtype=ds.GetRasterBand(1).DataType)    # RasterDataType object
         self.meta['block_size'] = tuple(
             ds.GetRasterBand(1).GetBlockSize())         # tuple
