@@ -609,7 +609,7 @@ class Raster():
     
     def apply_mask(self, mask_raster, in_mask_value, out_filename,
                    out_mask_value = 65636):
-        """Apply a mask to an image. It could be a multi-band image.
+        """Apply a mask to an image. It can be a multi-band image.
         
         :param mask_raster: the raster object of the mask to apply
         :param in_mask_value: the value of the pixels "masked" in mask_raster
@@ -641,8 +641,8 @@ class Raster():
             #store the temp files path and corresponding raster objects
             list_raster.append(Raster(out)) 
             list_file.append(out)
-        
-        #Concatenate each mono-band file in one
+            
+        #Concatenate each mono-band file in one file
         concatenate_images(list_raster, out_filename)
         
         #Delete the temp files
