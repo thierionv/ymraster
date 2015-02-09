@@ -609,7 +609,8 @@ class Raster():
     
     def apply_mask(self, mask_raster, in_mask_value, out_filename,
                    out_mask_value = 65636):
-        """Apply a mask to an image. It can be a multi-band image.
+        """Apply a mask to an image. It can be a multi-band image. It returns
+        a raster object of the masked image.
         
         :param mask_raster: the raster object of the mask to apply
         :param in_mask_value: the value of the pixels "masked" in mask_raster
@@ -649,6 +650,7 @@ class Raster():
         for fi in list_file:
             os.remove(fi)
         
+        return Raster(out_filename)
 
     def lsms_smoothing(self, out_smoothed_filename, spatialr, ranger,
                        out_spatial_filename, thres=0.1, rangeramp=0,
