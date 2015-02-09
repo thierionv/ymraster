@@ -944,7 +944,8 @@ class Raster():
         output = driver.Create(out_filename, nx, ny, d_obj, gdal.GDT_Float64)
         output.SetGeoTransform(GeoTransform)
         output.SetProjection(Projection)
-
+        
+        #TODO : créer une liste unique de type de stat
         #Compute the object image
         for j in range(d): #for each band
             im = data.GetRasterBand(j+1).ReadAsArray()#load the band in a array
@@ -958,9 +959,8 @@ class Raster():
                     arg = ["", percentile[k - len_var]]
                 for i in L_sorted:  # for each label
                     t = np.where((L == i))
-                    if t[0].any(): #if t is not empty
-                        arg[0] = im[t[0], t[1]]
-                        obj[t[0], t[1]] = fn[name](*arg)
+                    arg[0] = im[t[0], t[1]]
+                    obj[t[0], t[1]] = fn[name](*arg)
                 # Write the new band
                 temp = output.GetRasterBand(j * nb_var + k + 1)
                 temp.WriteArray(obj[:, :])
