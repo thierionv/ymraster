@@ -17,11 +17,11 @@ import subprocess
 
 
 def write_file_unique_value(filename,
-                             width,
-                             height,
-                             number_bands,
-                             dtype,
-                             value):
+                            width,
+                            height,
+                            number_bands,
+                            dtype,
+                            value):
     array = np.ones((height, width, number_bands),
                     dtype=dtype.numpy_dtype) * value \
         if number_bands > 1 \
@@ -73,11 +73,11 @@ class TestArrayToRaster(unittest.TestCase):
         value = 65535
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
         write_file_unique_value(out_file.name,
-                                 width,
-                                 height,
-                                 number_bands,
-                                 dtype,
-                                 value)
+                                width,
+                                height,
+                                number_bands,
+                                dtype,
+                                value)
         _check_output_image(self,
                             out_file.name,
                             u'GTiff',
@@ -98,11 +98,11 @@ class TestArrayToRaster(unittest.TestCase):
         value = 65535
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
         write_file_unique_value(out_file.name,
-                                 width,
-                                 height,
-                                 number_bands,
-                                 dtype,
-                                 value)
+                                width,
+                                height,
+                                number_bands,
+                                dtype,
+                                value)
         _check_output_image(self,
                             out_file.name,
                             u'GTiff',
@@ -123,11 +123,11 @@ class TestArrayToRaster(unittest.TestCase):
         value = 65535
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
         write_file_unique_value(out_file.name,
-                                 width,
-                                 height,
-                                 number_bands,
-                                 dtype,
-                                 value)
+                                width,
+                                height,
+                                number_bands,
+                                dtype,
+                                value)
         _check_output_image(self,
                             out_file.name,
                             u'GTiff',
@@ -334,7 +334,7 @@ class TestConcatenateImages(unittest.TestCase):
                             driver=u'GTiff',
                             width=rasters[0].meta['width'],
                             height=rasters[0].meta['height'],
-                            number_bands=rasters[0].meta['count'] * 5,
+                            number_bands=rasters[0].meta['count'] * 8,
                             dtype=rasters[0].meta['dtype'].ustr_dtype,
                             proj=rasters[0].meta['srs'].ExportToProj4())
 
