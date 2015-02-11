@@ -38,7 +38,8 @@ if __name__ == "__main__":
     
     #control the coherency of the arguments    
     d = xs_img.meta['count']
-    
+    if not args.idx :
+        print "Warning : none index specified in --idx argument.\n"
     if not all ([(boo in range(1,d+1)) for boo in args.idx ]):
         print "Error : one of the index specified is out of range.\n"
         exit()
