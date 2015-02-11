@@ -611,8 +611,8 @@ class Raster():
 
     def apply_mask(self, mask_raster, in_mask_value, out_filename,
                    out_mask_value = 65636):
-        """Apply a mask to an image. It could be a multi-band image.
-
+        """Apply a mask to an image. It can be a multi-band image. It returns
+        a raster object of the masked image.
         :param mask_raster: the raster object of the mask to apply
         :param in_mask_value: the value of the pixels "masked" in mask_raster
         :param out_filename: path of the output file
@@ -644,13 +644,14 @@ class Raster():
             list_raster.append(Raster(out))
             list_file.append(out)
 
-        #Concatenate each mono-band file in one
+        #Concatenate each mono-band file in one file
         concatenate_images(list_raster, out_filename)
 
         #Delete the temp files
         for fi in list_file:
             os.remove(fi)
 
+        return Raster(out_filename)
 
     def lsms_smoothing(self, out_smoothed_filename, spatialr, ranger,
                        out_spatial_filename, thres=0.1, rangeramp=0,
@@ -943,6 +944,7 @@ class Raster():
         output.SetGeoTransform(GeoTransform)
         output.SetProjection(Projection)
 
+        #TODO : créer une liste unique de type de stat
         #Compute the object image
         for j in range(d): #for each band
             im = data.GetRasterBand(j+1).ReadAsArray()#load the band in a array
@@ -956,9 +958,8 @@ class Raster():
                     arg = ["", percentile[k - len_var]]
                 for i in L_sorted:  # for each label
                     t = np.where((L == i))
-                    if t[0].any(): #if t is not empty
-                        arg[0] = im[t[0], t[1]]
-                        obj[t[0], t[1]] = fn[name](*arg)
+                    arg[0] = im[t[0], t[1]]
+                    obj[t[0], t[1]] = fn[name](*arg)
                 # Write the new band
                 temp = output.GetRasterBand(j * nb_var + k + 1)
                 temp.WriteArray(obj[:, :])

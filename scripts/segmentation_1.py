@@ -16,8 +16,8 @@ if __name__ == "__main__":
     desc = "Perform a chain of treatments from a given multi-spectral image" +\
             ". The treatments are : a fusion between the two images,a calcul"+\
             "ation of the ndvi band, an optional extraction of a chosen band"+\
-            " a concatenation between the ndvi and the ms image, and a LSMS "+\
-            " from this last image."
+            " a concatenation between the ndvi and the ms image, an optional"+\
+            "mask application and a LSMS from this last image."
     parser = argparse.ArgumentParser(description= desc)
     parser.add_argument("--xs_file", "-xs", help="Path of the multi-spectral" +
                         "image.",required = True)
@@ -27,42 +27,61 @@ if __name__ == "__main__":
                         "band", type = int, required = True)
     parser.add_argument("--idx_nir", "-nir", help="Chanel number of the nir " +
                         "band", type = int, required = True)
-    parser.add_argument("--estep", "-e",help="Do an extraction if notified",
-                        action = "store_true")
-    parser.add_argument("--idx", "-idx", help="Chanel number of the band to " +
-                        "be removed. Indexation starts at 1.",required = True,
+    parser.add_argument("--estep", "-e",help="(optional) Do an extraction if "+
+                        "notified", action = "store_true")
+    parser.add_argument("--idx", "-idx", help="(Required only if --estep" +
+                        " is specified). Chanel number of the band to be " +
+                        "removed. Indexation starts at 1.",required = True,
                         type = int)
+    parser.add_argument("--mask", "-mk",  help="(optional)Path of the mask to"+
+                        " apply. The mask must contend two values, one that " +
+                        "represents the pixels to hide, and an other to those"+
+                        " that are not to hide", default = "")
+    parser.add_argument("--in_mask_value", "-inv",  help="(optional, relevant"+
+                        " only if --mask is specified). The value of the " +
+                        "pixels masked in mask raster. The default value is "+
+                        "-9999", type = int, default = -9999)
+    parser.add_argument("--out_mask_value", "-outv",  help="(optional, " +
+                        "relevant only if --mask is specified). The value to "+
+                        "set to the pixels masked in the output file. The " +
+                        "default value is 65636", type = int, default = 65636)
     parser.add_argument("--spatialr", "-spr", help="Spatial radius of the " +
                         "neighborhooh",required = True, type = int)
     parser.add_argument("--ranger", "-rg", help="Range radius defining the " +
                         "radius (expressed in radiometry unit) in the multi" +
                         "-spectral space.",required = True, type = float)
-    parser.add_argument("--maxiter", "-max", help="Maximum number of " +
-                        "iterations of the algorithm used in "+
+    parser.add_argument("--maxiter", "-max", help="(optional). Maximum number "+
+                        "of iterations of the algorithm used in "+
                         "MeanSiftSmoothing application (default value is 10)",
                         type = int, default = 10)
-    parser.add_argument("--thres", "-th", help="Mean shift vector threshold" +
-                        "(default value is 0.1).", type = float, default = 0.1)
-    parser.add_argument("--rangeramp", "-rga", help="Range radius coefficient"+
-                        ": This coefficient makes dependent the ranger of the"+
-                        " colorimetry of the filtered pixel : y = rangeramp" +
-                        " * x + ranger(default value is 0).", type = float,
-                         default = 0)
-    parser.add_argument("--modesearch", "-mos", help="Mean shift vector thres"+
-                        "hold (default value is 0)",type = int,default = 0)
-    parser.add_argument("--tilesizex", "-tx",help="Size of tiles along the "+
-                        "X-axis (default value is 256)", type = int, default =
-                        256)
-    parser.add_argument("--tilesizey", "-ty",help="Size of tiles along the "+
-                        "Y-axis (default value is 256)", type = int, default =
-                        256)
-    parser.add_argument("--mstep", "-m",help="Do the merge step if notified",
-                        action = "store_true")
-    parser.add_argument("--minsize", "-ms",help="minimum size of a label",
-                        type = int)
-    parser.add_argument("--vstep", "-v",help="Do the vectorisation step if "+
-                        "notified", action = "store_true")
-    parser.add_argument("-out", "--out_file", help ="Name of the output file",
+    parser.add_argument("--thres", "-th", help="(optional). Mean shift vector "+
+                        "threshold (default value is 0.1).", type = float, 
+                        default = 0.1)
+    parser.add_argument("--rangeramp", "-rga", help="(optional). Range radius "+ 
+                        " coefficient : This coefficient makes dependent the "+
+                        "ranger of the colorimetry of the filtered pixel : " +
+                        "y = rangeramp * x + ranger(default value is 0).",
+                         type = float, default = 0)
+    parser.add_argument("--modesearch", "-mos", help="(optional). Mean shift "+
+                        " vector thres hold (default value is 0)",type = int,
+                        default = 0)
+    parser.add_argument("--tilesizex", "-tx",help="(optional). Size of tiles "+
+                        "along the X-axis (default value is 256)", type = int,
+                         default = 256)
+    parser.add_argument("--tilesizey", "-ty",help="(optional). Size of tiles "+
+                        "along the Y-axis (default value is 256)", type = int,
+                         default = 256)
+    parser.add_argument("--mstep", "-m",help="(optional). Do the merge step "+
+                        "if specified", action = "store_true")
+    parser.add_argument("--minsize", "-ms",help="(required only if --mstep is "+
+                        "specified). Minimum size of a label", type = int)
+    parser.add_argument("--vstep", "-v",help="(optional). Do the vectorisation"+
+                        " step if specified", action = "store_true")
+    parser.add_argument("-out", "--out_file", help ="Name of the output file. "+
+                        "The extension of the output file depends on what is "+
+                        "the last operation performed, eg : if --vstep is "+
+                        "specified, it must be something like \"my_output.shp"+
+                        "\", otherwise something like \"my_output.tif\".",
                         required = True, type = str)
     parser.add_argument("-d","--dir", default = "", help = "Path of the " +
                         "folder where the outputs will be written.")
@@ -107,7 +126,7 @@ if __name__ == "__main__":
     #---------------------------
     #---extraction (optional)---
     #---------------------------
-
+    
     if args.estep:
         #set of the parameter
         output_rmv = os.path.join(args.dir, tail + '_extracted.tif')
@@ -130,6 +149,23 @@ if __name__ == "__main__":
     concat_img = rmv_img.concatenate( list_im, output_concat)
     print "Concatenation step has been realized succesfully\n"
 
+    #--------------------------------------------
+    #-----------Apply a mask (optional)----------
+    #--------------------------------------------
+
+    if args.mask:
+        #Set of the instances and the output parameter
+        mask_img = Raster(args.mask)
+        output_masked = os.path.join(args.dir, tail + '_masked.tif')
+        
+        #Execution of the method
+        masked_img = concat_img.apply_mask( mask_img, args.in_mask_value,
+                                           output_masked,
+                                           out_mask_value = args.out_mask_value)
+        print "The mask has been applied succesfully"
+    else:
+        masked_img = concat_img
+
     #--------------------------
     #-----------LSMS-----------
     #--------------------------
@@ -141,7 +177,7 @@ if __name__ == "__main__":
                             str(args.rangeramp) + "_th_" + str(args.thres)\
                             + "_filtered.tif")
     out_spatial_filename = os.path.join(args.dir, tail + '_spatial.tif')
-    smooth_img,pos_img = concat_img.lsms_smoothing(out_smoothed_filename,
+    smooth_img,pos_img = masked_img.lsms_smoothing(out_smoothed_filename,
                                            args.spatialr, args.ranger,
                                            out_spatial_filename, thres =
                                            args.thres, rangeramp =

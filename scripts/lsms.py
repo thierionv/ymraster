@@ -51,16 +51,31 @@ if __name__ == "__main__":
                         type = int)
     parser.add_argument("--vstep", "-v",help="Do the vectorisation step if "+
                         "notified", action = "store_true")
+    parser.add_argument("--delete", "-del",help="Delete the transitional steps"+
+                        " specified; e.g. if 1 is specified the filtered image"+
+                        " will be deleted at the end of the treatment. By " +
+                        "default, all the transitional files are kept.",
+                        default = [], choices = [1,2,3], type = int, 
+                        nargs = '+')                
     parser.add_argument("-out", "--out_file", help ="Name of the output file",
                         required = True, type = str)
     parser.add_argument("-d","--dir", default = "", help = "Path of the " +
                         "folder where the outputs will be written.")
     args = parser.parse_args()
-
+    
+    print "\n"
     #control the coherency of the arguments
     if not(args.mstep) and args.minsize:
         print "Warning : --msize shouldn't be specified without --mstep\n"
-    print args
+    if not(args.vstep) and args.mstep and 3 in args.delete:
+        print "Error : The final file can not be deleted. Check the --delete"+\
+                " option.\n"
+        exit()
+    if not(args.vstep) and not(args.mstep) and 2 in args.delete:
+        print "Error : The final file can not be deleted. Check the --delete"+\
+                " option.\n"
+        exit()   
+    print args, "\n"
 
     #Extraction of the input file name
     head, ext = os.path.splitext(args.xs_file)
@@ -81,7 +96,7 @@ if __name__ == "__main__":
                                            args.rangeramp, maxiter =
                                            args.maxiter, modesearch =
                                            args.modesearch)
-    print "smoothing step has been realized succesfully"
+    print "smoothing step has been realized succesfully\n"
 
     #second step : segmentation
     if not(args.mstep or args.vstep):#If this is the final outup or not
@@ -91,11 +106,12 @@ if __name__ == "__main__":
     seg_img = smooth_img.lsms_segmentation (pos_img, output_seg, args.spatialr,
                                    args.ranger, tilesizex = args.tilesizex,
                                    tilesizey = args.tilesizey)
-    print "segmentation step has been realized succesfully"
+    print "segmentation step has been realized succesfully\n"
+    
 
     #third step (optional) : merging small regions
     if args.mstep:
-        if not args.vstep: #If this is the final outup or not
+        if not args.vstep: #If this is the final output or not
             output_merged = os.path.join(args.dir, args.out_file)
         else:
             output_merged = os.path.join(args.dir, tail + '_lsms_merged.tif')
@@ -103,13 +119,27 @@ if __name__ == "__main__":
                                           args.minsize, tilesizex = \
                                           args.tilesizex,tilesizey = \
                                           args.tilesizey)
-        print "merging step has been realized succesfully"
+        print "merging step has been realized succesfully\n"
     else:
         merged_img = seg_img
 
+    
+        
     #fourth step (optional) : vectorization
     if args.vstep:
         output_vector = os.path.join(args.dir, args.out_file)
         merged_img.lsms_vectorization(xs, output_vector, tilesizex = \
                                     args.tilesizex,tilesizey = args.tilesizey)
-        print "vectorization step has been realized succesfully"
+        print "vectorization step has been realized succesfully\n"
+
+    #delete the transitional files if specified in --delete argument
+    if 1 in args.delete:
+        os.remove(out_smoothed_filename)
+        os.remove(out_spatial_filename)
+        print "Step 1 files have been deleted.\n"
+    if 2 in args.delete:
+        os.remove(output_seg)
+        print "Step 2 file has been deleted.\n"
+    if 3 in args.delete and args.mstep:
+        os.remove(output_merged)
+        print "Step 3 file has been deleted.\n"
