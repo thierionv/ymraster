@@ -30,9 +30,9 @@ if __name__ == "__main__":
     parser.add_argument("--estep", "-e",help="(optional) Do an extraction if "+
                         "notified", action = "store_true")
     parser.add_argument("--idx", "-idx", help="(Required only if --estep" +
-                        " is specified). Chanel number of the band to be " +
-                        "removed. Indexation starts at 1.",required = True,
-                        type = int)
+                        " is specified). List of index of the band(s) to be " +
+                        "removed. Indexation starts at 1.",default = [],
+                        type = int, nargs ='+')
     parser.add_argument("--mask", "-mk",  help="(optional)Path of the mask to"+
                         " apply. The mask must contend two values, one that " +
                         "represents the pixels to hide, and an other to those"+
@@ -86,15 +86,24 @@ if __name__ == "__main__":
     parser.add_argument("-d","--dir", default = "", help = "Path of the " +
                         "folder where the outputs will be written.")
     args = parser.parse_args()
-
+    print "\n"
     #control the coherency of the arguments
+    spot_xs = Raster(args.xs_file)
+    d = spot_xs.meta['count']
     if not(args.mstep) and args.minsize:
-        print "Warning : --msize shouldn't be specified without --mstep"
+        print "Warning : --msize shouldn't be specified without --mstep\n"
     if not(args.estep) and args.idx:
-        print "Warning : --idx shouldn't be specified without --estep"
-
-    print args
-
+        print "Warning : --idx shouldn't be specified without --estep\n"
+    if not args.idx :
+        print "Warning : none index specified in --idx argument.\n"
+    if not all ([(boo in range(1,d+1)) for boo in args.idx ]):
+        print "Error : one of the index specified is out of range.\n"
+        exit()
+    if sorted(args.idx) == range(1,d+1):
+        print "Error : you can not remove all the bands.\n"
+        exit()  
+    print args,"\n"
+    
     #Extraction of the input file name
     head, ext = os.path.splitext(args.xs_file)
     tail = os.path.basename(head)
@@ -104,7 +113,6 @@ if __name__ == "__main__":
     #--------------------------
 
     #set of the instances and the parameters
-    spot_xs = Raster(args.xs_file)
     spot_pan = Raster(args.pan_file)
     output_fusion = os.path.join(args.dir, tail + '_fusion.tif')
 
@@ -162,7 +170,7 @@ if __name__ == "__main__":
         masked_img = concat_img.apply_mask( mask_img, args.in_mask_value,
                                            output_masked,
                                            out_mask_value = args.out_mask_value)
-        print "The mask has been applied succesfully"
+        print "The mask has been applied succesfully\n"
     else:
         masked_img = concat_img
 
