@@ -457,11 +457,11 @@ class Raster():
 
     def remove_band(self, idx, out_filename):
         """Writes a new raster (in the specified output file) which is the same
-        than the current raster, except that the band at the given index has
+        than the current raster, except that the band(s) at the given index has
         been remove.
 
-        :param idx: index of the band to remove (starts at 1)
-        :type idx: int
+        :param idx: list of index of the band(s) to remove (starts at 1)
+        :type idx: list of int
         :param out_filename: path to the output file
         :type out_filename: str
         :returns: the ``Raster`` instance corresponding to the output file
@@ -479,7 +479,7 @@ class Raster():
         # Concatenate the mono-band images without the unwanted band
         list_path = [os.path.join(gettempdir(), 'splitted_{}.tif'.format(i))
                      for i in range(self.meta['count'])
-                     if i + 1 != idx]
+                     if i + 1 not in idx]
         ConcatenateImages = otb.Registry.CreateApplication("ConcatenateImages")
         ConcatenateImages.SetParameterStringList("il", list_path)
         ConcatenateImages.SetParameterString("out", out_filename)
