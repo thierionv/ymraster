@@ -14,25 +14,38 @@ if __name__ == "__main__":
     from ymraster import *
     
     #Set of the parse arguments
-    parser = argparse.ArgumentParser(description= "Write a new image with the"+
-                                    " band at the given index removed\n ")
+    desc = "Writes a new raster (in the specified output file) which is the "+\
+            "same than the current raster, except that the band(s) at the "+\
+            "given index has been remove."
+    parser = argparse.ArgumentParser(description= desc)
     parser.add_argument("--xs_file","-xs", help="Path of the multi-spectral " +
                         "image", required = True)
-    parser.add_argument("--idx", "-idx", help="Chanel number of the band to " +
-                        "be removed. Indexation starts at 1.",required = True, 
-                        type = int)  
+    parser.add_argument("--idx", "-idx", help=" List of the index of"+
+                        " the band to be removed. Indexation starts at 1.",
+                        required = True, type = int, nargs = '+') 
     parser.add_argument("-out", "--out_file", help ="Name of the output file",
                         required = True, type = str)
     parser.add_argument("-d","--dir", default = "", help = "Path of the " +
                         "folder where the output will be written.")
     args = parser.parse_args()
-    print args
+    print "\n"
+    print args,"\n"
     
     
     #set of the instance and the output file name   
-    spot_xs = Raster(args.xs_file)
+    xs_img = Raster(args.xs_file)
     output_rmv = os.path.join(args.dir, args.out_file)
     
+    #control the coherency of the arguments    
+    d = xs_img.meta['count']
+    
+    if not all ([(boo in range(1,d+1)) for boo in args.idx ]):
+        print "Error : one of the index specified is out of range.\n"
+        exit()
+    if sorted(args.idx) == range(1,d+1):
+        print "Error : you can not remove all the bands.\n"
+        exit()    
+    
     #Execution of the method
-    rmv_img = spot_xs.remove_band(args.idx, output_rmv)
+    rmv_img = xs_img.remove_band(args.idx, output_rmv)
     print "Extraction has been realized succesfully\n"
