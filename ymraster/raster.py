@@ -315,6 +315,8 @@ class Raster():
         self.meta['count'] = ds.RasterCount             # int
         self.meta['dtype'] = data_type.RasterDataType(
             gdal_dtype=ds.GetRasterBand(1).DataType)    # RasterDataType object
+        self.meta['nodata_value'] = \
+            ds.GetRasterBand(1).GetNoDataValue()       # float
         self.meta['block_size'] = tuple(
             ds.GetRasterBand(1).GetBlockSize())         # tuple
         try:                                            # datetime object
@@ -440,6 +442,18 @@ class Raster():
         ds.SetMetadata({'TIFFTAG_DATETIME': dt.strftime('%Y:%m:%d %H:%M:%S')})
         ds = None
         self.meta['datetime'] = dt
+
+    def set_nodata_value(self, value):
+        """Writes the given nodata value into each raster's band.
+
+        :param value: value to be used as nodata for the whole raster
+        :type value: float
+        """
+        ds = gdal.Open(self.filename, gdal.GA_Update)
+        for i in range(self.meta['count']):
+            ds.GetRasterBand(i+1).SetNoDataValue(value)
+        ds = None
+        self.meta['nodata_value'] = value
 
     def remove_band(self, idx, out_filename):
         """Writes a new raster (in the specified output file) which is the same
