@@ -664,8 +664,10 @@ class Raster():
         #Delete the temp files
         for fi in list_file:
             os.remove(fi)
-
-        return Raster(out_filename)
+        out_raster = Raster(out_filename)
+        out_raster.set_nodata_value(out_mask_value)
+        
+        return out_raster
 
     def lsms_smoothing(self, out_smoothed_filename, spatialr, ranger,
                        out_spatial_filename, thres=0.1, rangeramp=0,
