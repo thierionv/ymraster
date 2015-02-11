@@ -139,7 +139,7 @@ def write_file(out_filename, overwrite=False, drivername=None, dtype=None,
                                xsize,
                                ysize,
                                number_bands,
-                               data_type.gdal_dtype)
+                               datatype.gdal_dtype)
 
     # Set metadata
     if dt:
@@ -608,49 +608,49 @@ class Raster():
         list_ = [self] + rasters
         concatenate_images(list_, out_filename)
         return Raster(out_filename)
-    
+
     def apply_mask(self, mask_raster, in_mask_value, out_filename,
                    out_mask_value = 65636):
         """Apply a mask to an image. It could be a multi-band image.
-        
+
         :param mask_raster: the raster object of the mask to apply
         :param in_mask_value: the value of the pixels "masked" in mask_raster
         :param out_filename: path of the output file
         :param out_mask_value: the value to set to the pixels masked in the
                             output file
         """
-        
+
         #get the number of bands
         d = self.meta['count']
-        
+
         #initialize variables
         list_raster = []
         list_file  = []
-        rasters = [self.filename, mask_raster.filename] 
+        rasters = [self.filename, mask_raster.filename]
         BandMath = otb.Registry.CreateApplication("BandMath")
-        
+
         #for each band, apply the mask and create a file
         for i in range(d):
             #conditional expression to set a new value to the input band
             exp = "(im2b1 == {}) ? {} : im1b{}".format(in_mask_value,
                                                         out_mask_value,i+1)
-                                                        
+
             out = os.path.join(gettempdir(),'mono_mask_{}.tif'.format(i))
             BandMath.SetParameterStringList("il", rasters)
-            BandMath.SetParameterString("out", out) 
-            BandMath.SetParameterString("exp", exp) 
+            BandMath.SetParameterString("out", out)
+            BandMath.SetParameterString("exp", exp)
             BandMath.ExecuteAndWriteOutput()
             #store the temp files path and corresponding raster objects
-            list_raster.append(Raster(out)) 
+            list_raster.append(Raster(out))
             list_file.append(out)
-        
+
         #Concatenate each mono-band file in one
         concatenate_images(list_raster, out_filename)
-        
+
         #Delete the temp files
         for fi in list_file:
             os.remove(fi)
-        
+
 
     def lsms_smoothing(self, out_smoothed_filename, spatialr, ranger,
                        out_spatial_filename, thres=0.1, rangeramp=0,
@@ -902,7 +902,7 @@ class Raster():
         #TODO : remove the following lines if necessary
         #mask = gdal.Open(mask_raster.filename)
         #M = mask.GetRasterBand(1).ReadAsArray()
-        
+
         # Get some parameters
         nx = data.RasterXSize
         ny = data.RasterYSize
