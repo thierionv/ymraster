@@ -494,6 +494,51 @@ class Raster():
 
         return Raster(out_filename)
 
+    def rescale(self, nband, outmin, outmax, outype, out_filename):
+        """Rescale a raster's band.
+
+        :param nband: index value to the band to rescale
+        :type nband: int
+        :param outmin: minimum value to the rescaled band
+        :type outmin: float
+        :param outmax: maximum value to the rescaled band
+        :type outmax: float
+        :param outype: type of the output image (gdal type: gdal.GDT_UInt16,
+                       gdal.GDT_UInt32, etc.)
+        :type outype: float
+        :param out_filename: path to the output file
+        :type out_filename: str
+        :returns: the ``Raster`` instance corresponding to the output file
+        """
+        ds = gdal.Open(self.filename, gdal.GA_ReadOnly)
+        band = ds.GetRasterBand(nband)
+        band.ComputeStatistics(True)
+        minval = band.GetMinimum()
+        maxval = band.GetMaximum()
+        nodata = band.GetNoDataValue()
+        data = band.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
+        indices = np.where(data != nodata)
+        data[indices] = outmin + ((outmax - outmin)
+                                  * ((data[indices] - minval)
+                                     / (maxval - minval)))
+        driver = gdal.GetDriverByName("GTiff")
+        dst_ds = driver.Create(out_filename, ds.RasterXSize, ds.RasterYSize,
+                               self.meta['count'], outype)
+        for i in range(self.meta['count']):
+            if i + 1 != nband:
+                dst_ds.GetRasterBand(i + 1).WriteArray(
+                    ds.GetRasterBand(i + 1).ReadAsArray())
+            else:
+                dst_ds.GetRasterBand(i + 1).WriteArray(data)
+            dst_ds.GetRasterBand(i + 1).ComputeStatistics(True)
+
+        dst_ds.SetProjection(ds.GetProjection())
+        dst_ds.SetGeoTransform(ds.GetGeoTransform())
+
+        driver = None
+        dst_ds = None
+        ds = None
+
     def fusion(self, pan, out_filename):
         """Sharpen the raster with a more detailed panchromatic image, and save
         the result into the specified output file.
@@ -666,7 +711,7 @@ class Raster():
             os.remove(fi)
         out_raster = Raster(out_filename)
         out_raster.set_nodata_value(out_mask_value)
-        
+
         return out_raster
 
     def lsms_smoothing(self, out_smoothed_filename, spatialr, ranger,
