@@ -378,13 +378,14 @@ class Raster():
         return win_list
 
     def array(self, idx_band=None, block_win=None):
-        """Returns the NumPy array corresponding to the raster.
+        """Returns the NumPy array extracted from the raster according to the
+        parameters
 
-        If the idx_band parameter is specified, then returns the NumPy array
-        corresponding only to the band in the raster which has the given index.
+        If the idx_band parameter is given, then it's the 2-dimensional array
+        corresponding to the band in the raster at specified index.
 
-        If the block_win parameter is specified, then returns the NumPy array
-        corresponding to the block in the raster at the given window.
+        If the block_win parameter is given, then it's the array corresponding
+        to the block in the raster at the specified window.
 
         :param idx_band: index of a band in the raster
         :type idx_band: int
