@@ -48,7 +48,7 @@ except ImportError as e:
     raise ImportError(
         str(e) + "\n\nPlease install NumPy.")
 
-import dtype as data_type
+import raster_dtype as rdtype
 import array_stat
 
 from fix_proj_decorator import fix_missing_proj
@@ -130,7 +130,7 @@ def write_file(out_filename, overwrite=False, drivername=None, dtype=None,
         number_bands = 1
     datatype = dtype \
         if dtype \
-        else data_type.RasterDataType(numpy_dtype=array.dtype)
+        else rdtype.RasterDataType(numpy_dtype=array.dtype)
 
     # Create an empty raster file if it does not exists or if overwrite is True
     try:
@@ -252,7 +252,7 @@ def temporal_stats(rasters, out_filename, drivername, idx_band=1,
     write_file(out_filename,
                overwrite=True,
                drivername=drivername,
-               dtype=data_type.RasterDataType(lstr_dtype='float64'),
+               dtype=rdtype.RasterDataType(lstr_dtype='float64'),
                width=raster0.meta['width'],
                height=raster0.meta['height'],
                depth=depth,
@@ -316,7 +316,7 @@ class Raster():
         self.meta['width'] = ds.RasterXSize             # int
         self.meta['height'] = ds.RasterYSize            # int
         self.meta['count'] = ds.RasterCount             # int
-        self.meta['dtype'] = data_type.RasterDataType(
+        self.meta['dtype'] = rdtype.RasterDataType(
             gdal_dtype=ds.GetRasterBand(1).DataType)    # RasterDataType object
         self.meta['nodata_value'] = \
             ds.GetRasterBand(1).GetNoDataValue()       # float
@@ -382,7 +382,7 @@ class Raster():
 
     def array(self, idx_band=None, block_win=None):
         """Returns the NumPy array extracted from the raster according to the
-        parameters
+        given parameters
 
         If the idx_band parameter is given, then it's the 2-dimensional array
         corresponding to the band in the raster at specified index.
@@ -459,17 +459,17 @@ class Raster():
         ds = None
         self.meta['nodata_value'] = value
 
-    def remove_band(self, idx, out_filename):
-        """Writes a new raster (in the specified output file) which is the same
-        than the current raster, except that the band(s) at the given index has
-        been remove.
+    def remove_bands(self, *idxs, **kw):
+        """Writes a raster which is the same than the current raster, except
+        that the band(s) at the given indices will be removed.
 
-        :param idx: list of index of the band(s) to remove (starts at 1)
-        :type idx: list of int
+        :param idxs: one or more indices of the band(s) to remove (starts at 1)
+        :type idxs: int
         :param out_filename: path to the output file
         :type out_filename: str
         :returns: the ``Raster`` instance corresponding to the output file
         """
+        indices = list(idxs)
         # Split the N-bands image into N mono-band images (in temp folder)
         SplitImage = otb.Registry.CreateApplication("SplitImage")
         SplitImage.SetParameterString("in", self.filename)
@@ -483,7 +483,8 @@ class Raster():
         # Concatenate the mono-band images without the unwanted band
         list_path = [os.path.join(gettempdir(), 'splitted_{}.tif'.format(i))
                      for i in range(self.meta['count'])
-                     if i + 1 not in idx]
+                     if i + 1 not in indices]
+        out_filename = dict(kw)['out_filename']
         ConcatenateImages = otb.Registry.CreateApplication("ConcatenateImages")
         ConcatenateImages.SetParameterStringList("il", list_path)
         ConcatenateImages.SetParameterString("out", out_filename)
@@ -498,7 +499,7 @@ class Raster():
 
         return Raster(out_filename)
 
-    def rescale(self, nband, outmin, outmax, outype, out_filename):
+    def rescale(self, nband, outmin, outmax, outype, out_filename=None):
         """Rescale a raster's band.
 
         :param nband: index value to the band to rescale
@@ -570,7 +571,7 @@ class Raster():
         return Raster(out_filename)
 
     @fix_missing_proj
-    def ndvi(self, out_filename, idx_red, idx_nir):
+    def ndvi(self, idx_red, idx_nir, out_filename):
         """Writes the Normalized Difference Vegetation Index (NDVI) of the
         raster into the specified output file.
 
@@ -598,7 +599,7 @@ class Raster():
         return Raster(out_filename)
 
     @fix_missing_proj
-    def ndwi(self, out_filename, idx_nir, idx_mir):
+    def ndwi(self, idx_nir, idx_mir, out_filename):
         """Writes the Normalized Difference Vegetation Index (NDWI) of the
         raster into the given output file.
 
@@ -628,7 +629,7 @@ class Raster():
     ndmi = ndwi
 
     @fix_missing_proj
-    def mndwi(self, out_filename, idx_green, idx_mir):
+    def mndwi(self, idx_green, idx_mir, out_filename):
         """Writes the Modified Normalized Difference Water Index (MNDWI) of the
         image into the given output file.
 

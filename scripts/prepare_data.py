@@ -52,7 +52,7 @@ if __name__ == "__main__":
                         "relevant only if --mask is specified). The value to "+
                         "set to the pixels masked in the output file. The " +
                         "default value is 65636", type = int, default = 65636)
-    
+
     parser.add_argument("-out", "--out_file", help ="Name of the output file. "+
                         "The extension of the output file depends on what is "+
                         "the last operation performed, eg : if --vstep is "+
@@ -63,7 +63,7 @@ if __name__ == "__main__":
                         "folder where the outputs will be written.")
     args = parser.parse_args()
     print "\n"
-    
+
     #control the coherency of the arguments
     spot_xs = Raster(args.xs_file)
     d = spot_xs.meta['count']
@@ -74,7 +74,7 @@ if __name__ == "__main__":
         exit()
     if sorted(args.idx) == range(1,d+1):
         print "Error : you can not remove all the bands.\n"
-        exit()    
+        exit()
     print args, "\n"
 
     #Extraction of the input file name
@@ -101,13 +101,13 @@ if __name__ == "__main__":
     output_ndvi = os.path.join(args.dir, tail + '_ndvi.tif')
 
     #Execution of the method
-    ndvi_img = fus_img.ndvi(output_ndvi, args.idx_red, args.idx_nir)
+    ndvi_img = fus_img.ndvi(args.idx_red, args.idx_nir, output_ndvi)
     print "Writting the ndvi image has been realized succesfully\n"
 
     #---------------------------
     #---extraction (optional)---
     #---------------------------
-    
+
     if args.estep:
         #set of the parameter
         output_rmv = os.path.join(args.dir, tail + '_extracted.tif')
@@ -141,7 +141,7 @@ if __name__ == "__main__":
         #Set of the instances and the output parameter
         mask_img = Raster(args.mask)
         output_masked = os.path.join(args.dir, args.out_file)
-        
+
         #Execution of the method
         masked_img = concat_img.apply_mask( mask_img, args.in_mask_value,
                                            output_masked,
@@ -150,4 +150,4 @@ if __name__ == "__main__":
     else:
         masked_img = concat_img
 
-    
+

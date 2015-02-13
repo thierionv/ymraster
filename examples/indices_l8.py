@@ -11,9 +11,9 @@ IMG = '../tests/data/l8_20130714.tif'
 
 def main():
     raster = Raster(IMG)
-    raster.ndvi('/tmp/l8_20130714_ndvi.tif', 4, 5)
-    raster.ndmi('/tmp/l8_20130714_ndwi.tif', 5, 6)
-    raster.ndsi('/tmp/l8_20130714_mndwi.tif', 3, 6)
+    raster.ndvi(4, 5, '/tmp/l8_20130714_ndvi.tif')
+    raster.ndmi(5, 6, '/tmp/l8_20130714_ndwi.tif')
+    raster.ndsi(3, 6, '/tmp/l8_20130714_mndwi.tif',)
 
 
 if __name__ == '__main__':

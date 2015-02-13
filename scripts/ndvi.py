@@ -35,7 +35,7 @@ def compute_ndvi():
                 "${basename}.ndvi.tif").substitute(
                     {'basename':
                      os.path.basename(os.path.splitext(filename)[0])})
-            raster.ndvi(out_filename, args.idx_red, args.idx_nir)
+            raster.ndvi(args.idx_red, args.idx_nir, out_filename)
 
 
 if __name__ == "__main__":

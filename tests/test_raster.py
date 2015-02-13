@@ -393,7 +393,7 @@ class TestOtbFunctions(unittest.TestCase):
 
     def test_should_remove_band(self):
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
-        result = self.raster.remove_band(6, out_file.name)
+        result = self.raster.remove_band(6, out_filename=out_file.name)
         self.assertEqual(result.meta['count'], self.raster.meta['count'] - 1)
         _check_output_image(tester=self,
                             filename=out_file.name,
@@ -406,7 +406,7 @@ class TestOtbFunctions(unittest.TestCase):
 
     def test_should_compute_ndvi(self):
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
-        self.raster.ndvi(out_file.name, idx_red=4, idx_nir=5)
+        self.raster.ndvi(idx_red=4, idx_nir=5, out_filename=out_file.name)
         _check_output_image(tester=self,
                             filename=out_file.name,
                             driver=u'GTiff',
@@ -419,7 +419,7 @@ class TestOtbFunctions(unittest.TestCase):
 
     def test_should_compute_ndwi(self):
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
-        self.raster.ndwi(out_file.name, idx_nir=4, idx_mir=5)
+        self.raster.ndwi(idx_nir=4, idx_mir=5, out_filename=out_file.name)
         _check_output_image(tester=self,
                             filename=out_file.name,
                             driver=u'GTiff',
@@ -432,7 +432,7 @@ class TestOtbFunctions(unittest.TestCase):
 
     def test_should_compute_mndwi(self):
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
-        self.raster.mndwi(out_file.name, idx_green=4, idx_mir=5)
+        self.raster.mndwi(idx_green=4, idx_mir=5, out_filename=out_file.name)
         _check_output_image(tester=self,
                             filename=out_file.name,
                             driver=u'GTiff',

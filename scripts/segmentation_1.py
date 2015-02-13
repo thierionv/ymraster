@@ -55,9 +55,9 @@ if __name__ == "__main__":
                         "MeanSiftSmoothing application (default value is 10)",
                         type = int, default = 10)
     parser.add_argument("--thres", "-th", help="(optional). Mean shift vector "+
-                        "threshold (default value is 0.1).", type = float, 
+                        "threshold (default value is 0.1).", type = float,
                         default = 0.1)
-    parser.add_argument("--rangeramp", "-rga", help="(optional). Range radius "+ 
+    parser.add_argument("--rangeramp", "-rga", help="(optional). Range radius "+
                         " coefficient : This coefficient makes dependent the "+
                         "ranger of the colorimetry of the filtered pixel : " +
                         "y = rangeramp * x + ranger(default value is 0).",
@@ -101,9 +101,9 @@ if __name__ == "__main__":
         exit()
     if sorted(args.idx) == range(1,d+1):
         print "Error : you can not remove all the bands.\n"
-        exit()  
+        exit()
     print args,"\n"
-    
+
     #Extraction of the input file name
     head, ext = os.path.splitext(args.xs_file)
     tail = os.path.basename(head)
@@ -128,13 +128,13 @@ if __name__ == "__main__":
     output_ndvi = os.path.join(args.dir, tail + '_ndvi.tif')
 
     #Execution of the method
-    ndvi_img = fus_img.ndvi(output_ndvi, args.idx_red, args.idx_nir)
+    ndvi_img = fus_img.ndvi(args.idx_red, args.idx_nir, output_ndvi)
     print "Writting the ndvi image has been realized succesfully\n"
 
     #---------------------------
     #---extraction (optional)---
     #---------------------------
-    
+
     if args.estep:
         #set of the parameter
         output_rmv = os.path.join(args.dir, tail + '_extracted.tif')
@@ -165,7 +165,7 @@ if __name__ == "__main__":
         #Set of the instances and the output parameter
         mask_img = Raster(args.mask)
         output_masked = os.path.join(args.dir, tail + '_masked.tif')
-        
+
         #Execution of the method
         masked_img = concat_img.apply_mask( mask_img, args.in_mask_value,
                                            output_masked,
