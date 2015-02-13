@@ -34,6 +34,7 @@ except AttributeError:
         "Please set the ITK_AUTOLOAD_PATH environment variable "
         "to the Orfeo Toolbox applications folder path "
         "(usually something like '/usr/lib/otb/applications') ")
+
 try:
     from osgeo import osr, gdal
     gdal.UseExceptions()
