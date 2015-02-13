@@ -41,11 +41,13 @@ try:
 except ImportError as e:
     raise ImportError(
         str(e) + "\n\nPlease install GDAL.")
+
 try:
     import numpy as np
 except ImportError as e:
     raise ImportError(
         str(e) + "\n\nPlease install NumPy.")
+
 import dtype as data_type
 import array_stat
 
