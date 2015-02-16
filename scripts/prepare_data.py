@@ -67,14 +67,19 @@ if __name__ == "__main__":
     #control the coherency of the arguments
     spot_xs = Raster(args.xs_file)
     d = spot_xs.meta['count']
-    if not args.idx :
-        print "Warning : none index specified in --idx argument.\n"
-    if not all ([(boo in range(1,d+1)) for boo in args.idx ]):
-        print "Error : one of the index specified is out of range.\n"
-        exit()
-    if sorted(args.idx) == range(1,d+1):
-        print "Error : you can not remove all the bands.\n"
-        exit()    
+    if args.estep: # if the argument extraction step is specified 
+        if not args.idx : # if the --idx argument is not specified
+            print "Warning : none index specified in --idx argument.\n"
+        else:
+            if not all ([(boo in range(1,d+1)) for boo in args.idx ]):
+                print "Error : one of the index specified is out of range.\n"
+                exit()
+            if sorted(args.idx) == range(1,d+1):
+                print "Error : you can not remove all the bands.\n"
+                exit()
+    else:
+        if args.idx:
+            print "Warning : --idx shoud not be specified without --estep.\n"
     print args, "\n"
 
     #Extraction of the input file name
