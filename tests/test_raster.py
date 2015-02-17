@@ -4,7 +4,7 @@ import unittest
 import doctest
 import tempfile
 
-from ymraster import write_file, concatenate_images, Raster
+from ymraster import write_file, concatenate_rasters, Raster
 from ymraster.dtype import RasterDataType
 from osgeo import ogr, osr
 import numpy as np
@@ -38,7 +38,7 @@ def _check_image(tester,
                  dtype,
                  proj=None,
                  transform=None,
-                 datetime=None,
+                 date_time=None,
                  min_=None,
                  max_=None,
                  mean=None,
@@ -185,7 +185,7 @@ class TestRaster(unittest.TestCase):
         self.assertEqual(raster.meta['count'], 7)
         self.assertEqual(raster.meta['dtype'].lstr_dtype, 'int16')
         self.assertEqual(raster.meta['block_size'], (66, 8))
-        self.assertEqual(raster.meta['datetime'], datetime(2013, 04, 25))
+        self.assertEqual(raster.meta['date_time'], datetime(2013, 04, 25))
         self.assertEqual(raster.meta['gdal_extent'],
                          ((936306.723651, 6461635.694121),
                           (936306.723651, 6459955.694121),
@@ -226,12 +226,21 @@ class TestRaster(unittest.TestCase):
         filename = 'data/RGB.byte.tif'
         raster = Raster(filename)
         blocks = raster.block_windows()
-        self.assertEqual(blocks[0], (0, 0, raster.meta['block_size'][0],
-                                     raster.meta['block_size'][1]))
-        self.assertEqual(blocks[-1], (0, 717, raster.meta['block_size'][0], 1))
-        self.assertEqual(sum([block[3] for block in blocks]),
-                         raster.meta['height'])
-        self.assertEqual(len(blocks), 240)
+        self.assertEqual(blocks.next(), (0, 0, raster.meta['block_size'][0],
+                                         raster.meta['block_size'][1]))
+        last_block = None
+        length = 1
+        total_height = raster.block_size[1]
+        while True:
+            try:
+                last_block = blocks.next()
+                length += 1
+                total_height += last_block[3]
+            except StopIteration:
+                break
+        self.assertEqual(last_block, (0, 717, raster.meta['block_size'][0], 1))
+        self.assertEqual(length, 240)
+        self.assertEqual(total_height, raster.meta['height'])
 
     def test_raster_should_get_block_list_with_given_size(self):
         filename = 'data/RGB.byte.tif'
@@ -243,14 +252,22 @@ class TestRaster(unittest.TestCase):
         number_blocks = \
             raster.meta['width'] / xsize * raster.meta['height'] / ysize
         blocks = raster.block_windows(block_size=(xsize, ysize))
-        self.assertEqual(blocks[0], (0, 0, xsize, ysize))
-        self.assertEqual(blocks[-1], (lastx, lasty, xsize, ysize))
-        self.assertEqual(len(blocks), number_blocks)
+        self.assertEqual(blocks.next(), (0, 0, xsize, ysize))
+        last_block = None
+        length = 1
+        while True:
+            try:
+                last_block = blocks.next()
+                length += 1
+            except StopIteration:
+                break
+        self.assertEqual(last_block, (lastx, lasty, xsize, ysize))
+        self.assertEqual(length, number_blocks)
 
     def test_raster_should_get_array(self):
         filename = 'data/RGB.byte.tif'
         raster = Raster(filename)
-        array = raster.array()
+        array = raster.array_from_bands()
         self.assertEqual(array.ndim, 3)
         self.assertEqual(array.shape, (718, 791, 3))
         self.assertEqual(array.dtype, 'UInt8')
@@ -258,7 +275,7 @@ class TestRaster(unittest.TestCase):
     def test_raster_should_get_array_one_band(self):
         filename = 'data/RGB.byte.tif'
         raster = Raster(filename)
-        array = raster.array(band_idx=1)
+        array = raster.array_from_bands(1)
         self.assertEqual(array.ndim, 2)
         self.assertEqual(array.shape, (718, 791))
         self.assertEqual(array.dtype, 'UInt8')
@@ -266,7 +283,7 @@ class TestRaster(unittest.TestCase):
     def test_raster_should_get_array_block(self):
         filename = 'data/RGB.byte.tif'
         raster = Raster(filename)
-        array = raster.array(block_win=(256, 256, 300, 300))
+        array = raster.array_from_bands(block_win=(256, 256, 300, 300))
         self.assertEqual(array.ndim, 3)
         self.assertEqual(array.shape, (300, 300, 3))
         self.assertEqual(array.dtype, 'UInt8')
@@ -274,7 +291,7 @@ class TestRaster(unittest.TestCase):
     def test_raster_should_get_array_block_one_band(self):
         filename = 'data/RGB.byte.tif'
         raster = Raster(filename)
-        array = raster.array(band_idx=2, block_win=(256, 256, 128, 128))
+        array = raster.array_from_bands(2, block_win=(256, 256, 128, 128))
         self.assertEqual(array.ndim, 2)
         self.assertEqual(array.shape, (128, 128))
         self.assertEqual(array.dtype, 'UInt8')
@@ -303,9 +320,9 @@ class TestRaster(unittest.TestCase):
         tmp_file = tempfile.NamedTemporaryFile(suffix='.tif')
         shutil.copyfile(filename, tmp_file.name)
         raster = Raster(tmp_file.name)
-        self.assertIsNone(raster.meta['datetime'])
+        self.assertIsNone(raster.meta['date_time'])
         dt = datetime(2014, 01, 01)
-        raster.datetime = dt
+        raster.date_time = dt
         _check_image(self,
                      tmp_file.name,
                      u'GTiff',
@@ -313,8 +330,8 @@ class TestRaster(unittest.TestCase):
                      718,
                      3,
                      'Byte',
-                     datetime=dt.strftime('%Y:%m:%d %H:%M:%S'))
-        self.assertEqual(raster.meta['datetime'], dt)
+                     date_time=dt.strftime('%Y:%m:%d %H:%M:%S'))
+        self.assertEqual(raster.meta['date_time'], dt)
 
 
 class TestConcatenateImages(unittest.TestCase):
@@ -328,7 +345,7 @@ class TestConcatenateImages(unittest.TestCase):
                    if filename.startswith('l8_')
                    and filename.endswith('.tif')]
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
-        concatenate_images(*rasters, out_filename=out_file.name)
+        concatenate_rasters(*rasters, out_filename=out_file.name)
         _check_image(tester=self,
                      filename=out_file.name,
                      driver=u'GTiff',
@@ -342,14 +359,14 @@ class TestConcatenateImages(unittest.TestCase):
         rasters = [Raster(os.path.join(self.folder, 'shade.tif')),
                    Raster(os.path.join(self.folder, 'shade_crop.tif'))]
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
-        self.assertRaises(AssertionError, concatenate_images, *rasters,
+        self.assertRaises(AssertionError, concatenate_rasters, *rasters,
                           outfilename=out_file.name)
 
     def test_concatenate_should_raise_assertion_error_if_not_same_proj(self):
         rasters = [Raster(os.path.join(self.folder, 'RGB.byte.tif')),
                    Raster(os.path.join(self.folder, 'RGB_unproj.byte.tif'))]
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
-        self.assertRaises(AssertionError, concatenate_images, *rasters,
+        self.assertRaises(AssertionError, concatenate_rasters, *rasters,
                           out_filename=out_file.name)
 
 
@@ -361,7 +378,7 @@ class TestFusion(unittest.TestCase):
     def test_fusion_should_work_if_same_date_same_extent(self):
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
         pan = Raster('data/Spot6_Pan_31072013.tif')
-        self.ms.fusion(pan, out_file.name)
+        self.ms.fusion(pan, out_filename=out_file.name)
         _check_image(tester=self,
                      filename=out_file.name,
                      driver=u'GTiff',
@@ -375,7 +392,7 @@ class TestFusion(unittest.TestCase):
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
         pan = Raster('data/Spot6_Pan_31072013_unproj.tif')
         self.assertRaises(AssertionError, self.ms.fusion, pan,
-                          out_file.name)
+                          out_filename=out_file.name)
 
     def tearDown(self):
         tmpdir = tempfile.gettempdir()
@@ -414,7 +431,7 @@ class TestOtbFunctions(unittest.TestCase):
                      height=self.raster.meta['height'],
                      number_bands=1,
                      dtype='Float32',
-                     datetime=self.raster.meta['datetime'],
+                     date_time=self.raster.meta['date_time'],
                      proj=self.raster.meta['srs'].ExportToProj4())
 
     def test_should_compute_ndwi(self):
@@ -427,7 +444,7 @@ class TestOtbFunctions(unittest.TestCase):
                      height=self.raster.meta['height'],
                      number_bands=1,
                      dtype='Float32',
-                     datetime=self.raster.meta['datetime'],
+                     date_time=self.raster.meta['date_time'],
                      proj=self.raster.meta['srs'].ExportToProj4())
 
     def test_should_compute_mndwi(self):
@@ -440,7 +457,7 @@ class TestOtbFunctions(unittest.TestCase):
                      height=self.raster.meta['height'],
                      number_bands=1,
                      dtype='Float32',
-                     datetime=self.raster.meta['datetime'],
+                     date_time=self.raster.meta['date_time'],
                      proj=self.raster.meta['srs'].ExportToProj4())
 
     def test_lsms_segmentation_should_compute_segmented_image(self):
@@ -468,7 +485,7 @@ class TestOtbFunctions(unittest.TestCase):
                      proj=self.raster.meta['srs'].ExportToProj4())
 
         # Output vector should have same number of polygon than label
-        array = out_raster.array()
+        array = out_raster.array_from_bands()
         number_labels = len(np.unique(array))
         ds = ogr.Open(out_vector_filename)
         layer = ds.GetLayer(0)
