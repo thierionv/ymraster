@@ -6,7 +6,9 @@ Created on Wed Feb  4 14:54:42 2015
 """
 import scipy as sp
 from osgeo import gdal
-
+from ymraster import Raster, write_file
+from ymraster.dtype import RasterDataType
+from sklearn import tree
 
 def get_samples_from_roi(in_rst_label,in_rst_roi,in_rst_stat ):
     '''
@@ -28,7 +30,7 @@ def get_samples_from_roi(in_rst_label,in_rst_roi,in_rst_stat ):
             referenced samples and d is the number of features. Each line of 
             the matrix is sample.
             
-            Y: the classe of the samples in a vertical n matrix. 
+            Y: the classes of the samples in a vertical n matrix. 
     ''' 
     
     ## Open data
@@ -118,7 +120,7 @@ def get_samples_from_label_img(in_rst_label, in_rst_stat):
             label and d is the number of features. Each line of 
             the matrix is label.
             
-            reverse: everse matrix that can permit to rebuild an image from the 
+            reverse: reverse matrix that can permit to rebuild an image from the 
             result of an object classification. 
     """
     ## Open data
@@ -175,4 +177,62 @@ def get_samples_from_label_img(in_rst_label, in_rst_stat):
     del temp, indices, d, nb_samp, col, l, l_ind 
     
     return X, reverse
+
+def decision_tree(X_train, Y_train, X_test, X_img, reverse_array, raster, 
+                  out_filename, ext = 'Gtiff' ):
+    """
+    :param X_train: The sample-features matrix used to train the model, a n*d 
+                    array where n is the number of referenced samples and d is 
+                    the number of features.
+    :param Y_train: The classes of the samples in a vertical n matrix.
+    :param X_test: The sample-features matrix corresponding to the validation 
+                    dataset on which the model is applied, a n*d array where n 
+                    is the number of referenced samples and d is the number of 
+                    features.
+    :param X_img: The sample-features matrix corresponding to the wole image
+                    on which the model is applied, a n*d array where n is the 
+                    number of referenced samples and d is the number of 
+                    features.
+    :param reverse_array:The reverse matrix use to rebuild into the origin
+                        dimension the result of the classification. This matrix
+                        is supposed to be computed previously (cf. 
+                        get_samples_from_label_img() #TODO)
+    :param raster: The raster object that contains all the meta-data that should
+                    be set on the classification image written, eg : it could be
+                    the raster object of the labelled image.
+    :param out_filename: Name of the classification image to be written.
+    :param ext: Format of the output image to be written. Any formats
+                supported by GDAL. The default value is 'Gtiff'.
+    :returns:
+            y_predict: The classes predicted for the validation dataset, in a 
+                        vertical n matrix. It is useful to compute prediction 
+                        error metrics.
+    """
+    #Get some parameters    
+    rows = raster.meta['height']
+    col = raster.meta['width']
+    proj = raster.meta['srs']
+    geotransform = raster.meta['transform']    
     
+    #Set the DecisionTreeClassifier
+    clf = tree.DecisionTreeClassifier()
+    
+    #Train the model
+    clf = clf.fit(X_train, Y_train)
+    
+    #Perform the prediction on the whole label image
+    classif = clf.predict(X_img)
+    
+    #Perform the prediction on the test sample
+    y_predict = clf.predict(X_test)
+    
+    #Rebuild the image from the classif flat array with the given reverse array
+    classif = classif[reverse_array]
+    classif = classif.reshape(rows,col)
+    
+    #write the file
+    write_file(out_filename, overwrite=True, drivername= ext, 
+               dtype= RasterDataType(numpy_dtype = sp.uint32), array=classif,
+                 srs= proj, transform=geotransform)
+                 
+    return y_predict
