@@ -9,7 +9,7 @@ It has some attributes:
 
 >>> raster.filename
 'tests/data/RGB.byte.tif'
->>> raster.meta['width']
+>>> raster.width
 791
 
 Functions and methods
@@ -53,6 +53,7 @@ import array_stat
 
 from fix_proj_decorator import fix_missing_proj
 
+from collections import Sized
 from datetime import datetime
 from time import mktime
 import os
@@ -169,7 +170,7 @@ def write_file(out_filename, overwrite=False, drivername=None, dtype=None,
     out_ds = None
 
 
-def concatenate_images(rasters, out_filename):
+def concatenate_images(*rasters, **kw):
     """Write a raster which is the concatenation of the given rasters, in order.
 
     All bands in all input rasters must have same size.
@@ -186,26 +187,28 @@ def concatenate_images(rasters, out_filename):
     :type out_filename: str to the output file
     """
     # Check for proj, extent & type (and that list not empty)
+    rasters = list(rasters)
     raster0 = rasters[0]
-    srs, extent, otb_dtype = (raster0.meta['srs'],
-                              raster0.meta['gdal_extent'],
-                              raster0.meta['dtype'].otb_dtype)
+    srs, extent, otb_dtype = (raster0.srs,
+                              raster0.gdal_extent,
+                              raster0.dtype.otb_dtype)
     assert srs is not None, \
         "Image has no Coordinate Reference System: '{}'".format(
             raster0.filename)
     same_type = True
     for raster in rasters:
-        assert raster.meta['srs'] is not None \
-            and raster.meta['srs'].IsSame(srs), \
+        assert raster.srs is not None \
+            and raster.srs.IsSame(srs), \
             "Images have not the same Coordinate Reference System: "
         "'{}' and '{}'".format(raster0.filename, raster.filename)
-        assert raster.meta['gdal_extent'] == extent, \
+        assert raster.gdal_extent == extent, \
             "Images have not the same extent: "
         "'{}' and '{}'".format(raster0.filename, raster.filename)
-        if raster.meta['dtype'].otb_dtype != otb_dtype:
+        if raster.dtype.otb_dtype != otb_dtype:
             same_type = False
 
     # Perform the concatenation
+    out_filename = kw['out_filename']
     filenames = [raster.filename for raster in rasters]
     ConcatenateImages = otb.Registry.CreateApplication("ConcatenateImages")
     ConcatenateImages.SetParameterStringList("il", filenames)
@@ -215,7 +218,7 @@ def concatenate_images(rasters, out_filename):
     ConcatenateImages.ExecuteAndWriteOutput()
 
 
-def temporal_stats(rasters, out_filename, drivername, idx_band=1,
+def temporal_stats(rasters, out_filename, drivername, band_idx=1,
                    stats=['min', 'max'], date2float=_dt2float):
     """Compute pixel-wise statistics from a given list of temporally distinct,
     but spatially identical, rasters.
@@ -235,8 +238,8 @@ def temporal_stats(rasters, out_filename, drivername, idx_band=1,
     :type out_filename: str
     :param drivername: driver to use for writing the output file
     :type drivername: str
-    :param idx_band: index of the band to compute statistics on (default: 1)
-    :type idx_band: int
+    :param band_idx: index of the band to compute statistics on (default: 1)
+    :type band_idx: int
     :param stats: list of stats to compute
     :type stats: list of str
     :param date2float: function which returns a float from a datetime object.
@@ -253,11 +256,11 @@ def temporal_stats(rasters, out_filename, drivername, idx_band=1,
                overwrite=True,
                drivername=drivername,
                dtype=rdtype.RasterDataType(lstr_dtype='float64'),
-               width=raster0.meta['width'],
-               height=raster0.meta['height'],
+               width=raster0.width,
+               height=raster0.height,
                depth=depth,
-               srs=raster0.meta['srs'],
-               transform=raster0.meta['transform'])
+               srs=raster0.srs,
+               transform=raster0.transform)
 
     # TODO: improve to find better "natural" blocks than using the "natural"
     # segmentation of simply the first image
@@ -265,7 +268,7 @@ def temporal_stats(rasters, out_filename, drivername, idx_band=1,
 
     for block_win in block_wins:
         # Turn each block into an array and concatenate them into a stack
-        block_arrays = [raster.array(idx_band, block_win) for raster in rasters]
+        block_arrays = [raster.array(band_idx, block_win) for raster in rasters]
         block_stack = np.dstack(block_arrays) \
             if len(block_arrays) > 1 \
             else block_arrays[0]
@@ -278,7 +281,12 @@ def temporal_stats(rasters, out_filename, drivername, idx_band=1,
             if astat.is_summary:  # If summary stat, compute date of occurence
                 date_array = astat.indices(block_stack)
                 for x in np.nditer(date_array, op_flags=['readwrite']):
-                    x[...] = date2float(rasters[x].meta['datetime'])
+                    try:
+                        x[...] = date2float(rasters[x]._datetime)
+                    except TypeError:
+                        raise ValueError(
+                            'Image has no date/time metadata: {:b}'.format(
+                                rasters[x]))
                 stat_array_list.append(date_array)
 
         # Concatenate results into a stack and save the block to the output file
@@ -290,7 +298,7 @@ def temporal_stats(rasters, out_filename, drivername, idx_band=1,
                    xoffset=xoffset, yoffset=yoffset)
 
 
-class Raster():
+class Raster(Sized):
     """Represents a raster image that was read from a file.
 
     The whole raster *is not* loaded into memory. Instead this class records
@@ -301,49 +309,157 @@ class Raster():
     """
 
     def __init__(self, filename):
-        """Create a new raster object read from a file, and compute useful
-        properties.
+        """Create a new raster object read from a file
 
-        :param filename: a string containing the path of the image to read
-        :param bands: band names (eg. 'blue', 'red', 'infrared, etc.)
+        :param filename: path to the file to read
+        :type filename: str
         """
-        self.filename = filename
+        self._filename = filename
+        self.refresh()
 
-        # Read information from image
-        ds = gdal.Open(self.filename, gdal.GA_ReadOnly)
-        self.meta = {}
-        self.meta['driver'] = ds.GetDriver()            # gdal.Driver object
-        self.meta['width'] = ds.RasterXSize             # int
-        self.meta['height'] = ds.RasterYSize            # int
-        self.meta['count'] = ds.RasterCount             # int
-        self.meta['dtype'] = rdtype.RasterDataType(
+    def __repr__(self):
+        return "{}('{}')".format(self.__class__.__name__,
+                                 os.path.abspath(self._filename))
+
+    def __str__(self):
+        return self.__format__()
+
+    def __format__(self, format_spec=''):
+        if format_spec and format_spec.startswith('b'):
+            s = os.path.basename(self._filename)
+            return s.__format__(format_spec[1:])
+        else:
+            s = os.path.abspath(self._filename)
+            return s.__format__(format_spec)
+
+    def __len__(self):
+        return self._count
+
+    @property
+    def filename(self):
+        """The raster's filename (str)"""
+        return self._filename
+
+    @property
+    def driver(self):
+        """The raster's GDAL driver (gdal.Driver object)"""
+        return self._driver
+
+    @property
+    def width(self):
+        """The raster's width (int)"""
+        return self._width
+
+    @property
+    def height(self):
+        """The raster's height (int)"""
+        return self._height
+
+    @property
+    def count(self):
+        """The raster's count or number of bands (int)"""
+        return self._count
+
+    @property
+    def dtype(self):
+        """The raster's data type (rdtype.RasterDataType object)"""
+        return self._dtype
+
+    @property
+    def block_size(self):
+        """The raster's natural block size (tuple of int)"""
+        return self._block_size
+
+    @property
+    def datetime(self):
+        """The raster's date/time (datetime.datetime object)"""
+        return self._datetime
+
+    @property
+    def nodata_value(self):
+        """The raster's NODATA value (self.dtype value)"""
+        return self._nodata_value
+
+    @property
+    def transform(self):
+        """The raster's geo-transformation (tuple of floats)"""
+        return self._transform
+
+    @property
+    def gdal_extent(self):
+        """The raster's extent, as given by GDAL (tuple of floats)"""
+        return self._gdal_extent
+
+    @property
+    def srs(self):
+        """The raster's projection (osr.SpatialReference object)"""
+        return self._srs
+
+    @property
+    def meta(self):
+        """Returns a dictionary containing the raster's metadata
+
+        :rtype: dict
+        """
+        return {k: getattr(self, k)
+                for k, v in self.__class__.__dict__.iteritems()
+                if k != 'meta' and isinstance(v, property)}
+
+    @datetime.setter
+    def datetime(self, dt):
+        ds = gdal.Open(self._filename, gdal.GA_Update)
+        ds.SetMetadata({'TIFFTAG_DATETIME': dt.strftime('%Y:%m:%d %H:%M:%S')})
+        ds = None
+        self.refresh()
+
+    @nodata_value.setter
+    def nodata_value(self, value):
+        ds = gdal.Open(self._filename, gdal.GA_Update)
+        for i in range(self._count):
+            ds.GetRasterBand(i+1).SetNoDataValue(value)
+        ds = None
+        self.refresh()
+
+    @srs.setter
+    def srs(self, sr):
+        ds = gdal.Open(self._filename, gdal.GA_Update)
+        ds.SetProjection(sr.ExportToWkt())
+        ds = None
+        self.refresh()
+
+    def refresh(self):
+        """Refresh instance properties with metadata read from the file."""
+        ds = gdal.Open(self._filename, gdal.GA_ReadOnly)
+        self._driver = ds.GetDriver()                   # gdal.Driver object
+        self._width = ds.RasterXSize                    # int
+        self._height = ds.RasterYSize                   # int
+        self._count = ds.RasterCount                    # int
+        self._dtype = rdtype.RasterDataType(
             gdal_dtype=ds.GetRasterBand(1).DataType)    # RasterDataType object
-        self.meta['nodata_value'] = \
-            ds.GetRasterBand(1).GetNoDataValue()       # float
-        self.meta['block_size'] = tuple(
+        self._block_size = tuple(
             ds.GetRasterBand(1).GetBlockSize())         # tuple
         try:                                            # datetime object
-            self.meta['datetime'] = datetime.strptime(
+            self._datetime = datetime.strptime(
                 ds.GetMetadataItem('TIFFTAG_DATETIME'), '%Y:%m:%d %H:%M:%S')
         except ValueError:  # string has wrong datetime format
-            self.meta['datetime'] = None
+            self._datetime = None
         except TypeError:   # there is no DATETIME tag
-            self.meta['datetime'] = None
-        self.meta['transform'] = ds.GetGeoTransform(    # tuple
-            can_return_null=True)
-        self.meta['gdal_extent'] = tuple(               # tuple
-            (ds.GetGeoTransform()[0]
-             + x * ds.GetGeoTransform()[1]
-             + y * ds.GetGeoTransform()[2],
-             ds.GetGeoTransform()[3]
-             + x * ds.GetGeoTransform()[4]
-             + y * ds.GetGeoTransform()[5])
-            for (x, y) in [(0, 0), (0, ds.RasterYSize), (ds.RasterXSize, 0),
-                           (ds.RasterXSize, ds.RasterYSize)])
+            self._datetime = None
+        self._nodata_value = ds.GetRasterBand(1).GetNoDataValue()   # float
+        self._transform = ds.GetGeoTransform(can_return_null=True)  # tuple
+        self._gdal_extent = tuple(
+            (self._transform[0]
+             + x * self._transform[1]
+             + y * self._transform[2],
+             self._transform[3]
+             + x * self._transform[4]
+             + y * self._transform[5])
+            for (x, y) in ((0, 0), (0, ds.RasterYSize), (ds.RasterXSize, 0),
+                           (ds.RasterXSize, ds.RasterYSize)))       # tuple
 
-        # Read spatial reference as a osr.SpatialReference object or None
-        # if there is no srs in metadata
-        self.meta['srs'] = osr.SpatialReference(ds.GetProjection()) \
+        # Read projection as a osr.SpatialReference object
+        # or None if there is no projection in metadata
+        self._srs = osr.SpatialReference(ds.GetProjection()) \
             if ds.GetProjection() \
             else None
 
@@ -363,35 +479,35 @@ class Raster():
         # Default size for blocks
         xsize, ysize = block_size \
             if block_size is not None \
-            else self.meta['block_size']
+            else self.block_size
 
         # Compute the list
         win_list = []
-        for i in range(0, self.meta['height'], ysize):
+        for i in range(0, self._height, ysize):
             # Block height is ysize except at the bottom of the raster
             number_rows = ysize \
-                if i + ysize < self.meta['height'] \
-                else self.meta['height'] - i
-            for j in range(0, self.meta['width'], xsize):
+                if i + ysize < self._height \
+                else self._height - i
+            for j in range(0, self._width, xsize):
                 # Block width is xsize except at the right of the raster
                 number_cols = xsize \
-                    if j + ysize < self.meta['width'] \
-                    else self.meta['width'] - j
+                    if j + ysize < self._width \
+                    else self._width - j
                 win_list.append((j, i, number_cols, number_rows))
         return win_list
 
-    def array(self, idx_band=None, block_win=None):
+    def array(self, band_idx=None, block_win=None):
         """Returns the NumPy array extracted from the raster according to the
         given parameters
 
-        If the idx_band parameter is given, then it's the 2-dimensional array
+        If the band_idx parameter is given, then it's the 2-dimensional array
         corresponding to the band in the raster at specified index.
 
         If the block_win parameter is given, then it's the array corresponding
         to the block in the raster at the specified window.
 
-        :param idx_band: index of a band in the raster
-        :type idx_band: int
+        :param band_idx: index of a band in the raster
+        :type band_idx: int
         :param block_win: block window in the raster (x, y, hsize, vsize)
         :type block_win: 4-tuple of int
         :rtype: numpy.ndarray
@@ -400,18 +516,18 @@ class Raster():
         # Array size
         (hsize, vsize) = (block_win[2], block_win[3]) \
             if block_win is not None \
-            else (self.meta['width'], self.meta['height'])
-        depth = 1 if idx_band is not None else self.meta['count']
+            else (self._width, self._height)
+        depth = 1 if band_idx is not None else self._count
 
         # Initialize an empty array of correct size and type
         if depth != 1:
             array = np.empty((vsize, hsize, depth),
-                             dtype=self.meta['dtype'].numpy_dtype)
+                             dtype=self.dtype.numpy_dtype)
 
         # Fill the array
-        ds = gdal.Open(self.filename, gdal.GA_ReadOnly)
+        ds = gdal.Open(self._filename, gdal.GA_ReadOnly)
         for array_i in range(depth):
-            ds_i = idx_band if idx_band is not None else array_i + 1
+            ds_i = band_idx if band_idx is not None else array_i + 1
             if depth == 1 and block_win is not None:
                 array = ds.GetRasterBand(ds_i).ReadAsArray(*block_win)
             elif depth == 1 and block_win is None:
@@ -424,40 +540,6 @@ class Raster():
         ds = None
 
         return array
-
-    def set_projection(self, srs):
-        """Writes the given projection into the raster's metadata.
-
-        :param srs: projection to set
-        :type srs: osgeo.osr.SpatialReference
-        """
-        ds = gdal.Open(self.filename, gdal.GA_Update)
-        ds.SetProjection(srs.ExportToWkt())
-        ds = None
-        self.meta['srs'] = srs
-
-    def set_datetime(self, dt):
-        """Writes the given datetime into the raster's metadata.
-
-        :param dt: datetime to set
-        :type dt: datetime.datetime
-        """
-        ds = gdal.Open(self.filename, gdal.GA_Update)
-        ds.SetMetadata({'TIFFTAG_DATETIME': dt.strftime('%Y:%m:%d %H:%M:%S')})
-        ds = None
-        self.meta['datetime'] = dt
-
-    def set_nodata_value(self, value):
-        """Writes the given nodata value into each raster's band.
-
-        :param value: value to be used as nodata for the whole raster
-        :type value: float
-        """
-        ds = gdal.Open(self.filename, gdal.GA_Update)
-        for i in range(self.meta['count']):
-            ds.GetRasterBand(i+1).SetNoDataValue(value)
-        ds = None
-        self.meta['nodata_value'] = value
 
     def remove_bands(self, *idxs, **kw):
         """Writes a raster which is the same than the current raster, except
@@ -472,77 +554,71 @@ class Raster():
         indices = list(idxs)
         # Split the N-bands image into N mono-band images (in temp folder)
         SplitImage = otb.Registry.CreateApplication("SplitImage")
-        SplitImage.SetParameterString("in", self.filename)
+        SplitImage.SetParameterString("in", self._filename)
         SplitImage.SetParameterString("out", os.path.join(gettempdir(),
                                                           'splitted.tif'))
         SplitImage.SetParameterOutputImagePixelType(
             "out",
-            self.meta['dtype'].otb_dtype)
+            self._dtype.otb_dtype)
         SplitImage.ExecuteAndWriteOutput()
 
         # Concatenate the mono-band images without the unwanted band
         list_path = [os.path.join(gettempdir(), 'splitted_{}.tif'.format(i))
-                     for i in range(self.meta['count'])
+                     for i in range(self._count)
                      if i + 1 not in indices]
-        out_filename = dict(kw)['out_filename']
+        out_filename = kw['out_filename']
         ConcatenateImages = otb.Registry.CreateApplication("ConcatenateImages")
         ConcatenateImages.SetParameterStringList("il", list_path)
         ConcatenateImages.SetParameterString("out", out_filename)
         ConcatenateImages.SetParameterOutputImagePixelType(
             "out",
-            self.meta['dtype'].otb_dtype)
+            self._dtype.otb_dtype)
         ConcatenateImages.ExecuteAndWriteOutput()
 
         # Delete mono-band images in temp folder
-        for i in range(self.meta['count']):
+        for i in range(self._count):
             os.remove(os.path.join(gettempdir(), 'splitted_{}.tif'.format(i)))
 
         return Raster(out_filename)
 
-    def rescale(self, nband, outmin, outmax, outype, out_filename=None):
+    def rescale(self, band_idx, dstmin, dstmax, out_filename=None):
         """Rescale a raster's band.
 
-        :param nband: index value to the band to rescale
-        :type nband: int
+        :param band_idx: index value to the band to rescale
+        :type band_idx: int
         :param outmin: minimum value to the rescaled band
         :type outmin: float
         :param outmax: maximum value to the rescaled band
         :type outmax: float
-        :param outype: type of the output image (gdal type: gdal.GDT_UInt16,
-                       gdal.GDT_UInt32, etc.)
-        :type outype: float
         :param out_filename: path to the output file
         :type out_filename: str
         :returns: the ``Raster`` instance corresponding to the output file
         """
-        ds = gdal.Open(self.filename, gdal.GA_ReadOnly)
-        band = ds.GetRasterBand(nband)
-        band.ComputeStatistics(True)
-        minval = band.GetMinimum()
-        maxval = band.GetMaximum()
-        nodata = band.GetNoDataValue()
-        data = band.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
-        indices = np.where(data != nodata)
-        data[indices] = outmin + ((outmax - outmin)
-                                  * ((data[indices] - minval)
-                                     / (maxval - minval)))
+        array = self.array(band_idx=band_idx)
+        srcmin = array.min()
+        srcmax = array.max()
+        nodata_value = self._no_data_value
+        indices = np.where(array != nodata_value)
+        array[indices] = dstmin + ((dstmax - dstmin) / (srcmax - srcmin)) \
+            * (array[indices] - srcmin)
         driver = gdal.GetDriverByName("GTiff")
-        dst_ds = driver.Create(out_filename, ds.RasterXSize, ds.RasterYSize,
-                               self.meta['count'], outype)
-        for i in range(self.meta['count']):
-            if i + 1 != nband:
+        dst_ds = driver.Create(
+            out_filename,
+            self._width,
+            self._height,
+            self._count,
+            rdtype.RasterDataType(gdal_dtype=gdal.GDT_Float64))
+        for i in range(self._count):
+            if i + 1 != band_idx:
                 dst_ds.GetRasterBand(i + 1).WriteArray(
-                    ds.GetRasterBand(i + 1).ReadAsArray())
+                    self.array(band_idx=i+1))
             else:
-                dst_ds.GetRasterBand(i + 1).WriteArray(data)
-            dst_ds.GetRasterBand(i + 1).ComputeStatistics(True)
+                dst_ds.GetRasterBand(i + 1).WriteArray(array)
 
-        dst_ds.SetProjection(ds.GetProjection())
-        dst_ds.SetGeoTransform(ds.GetGeoTransform())
+        dst_ds.SetProjection(self._srs)
+        dst_ds.SetGeoTransform(self._transform)
 
-        driver = None
         dst_ds = None
-        ds = None
 
     def fusion(self, pan, out_filename):
         """Sharpen the raster with a more detailed panchromatic image, and save
@@ -554,16 +630,22 @@ class Raster():
         :type out_filename: str
         :returns: the ``Raster`` instance corresponding to the output file
         """
-        assert (self.meta['srs'] is not None
-                and pan.meta['srs'] is not None
-                and self.meta['srs'].IsSame(pan.meta['srs'])) \
-            or (self.meta['srs'] is None
-                and pan.meta['srs'] is None), \
-            "Images have not the same Coordinate Reference System : "
-        "'{}' and '{}'".format(self.filename, pan.filename)
+        almost_equal = tuple(
+            map(lambda t1, t2: (abs(t1[0] - t2[0]) <= 0.01,
+                                abs(t1[1] - t2[1]) <= 0.01),
+                self._gdal_extent, pan.gdal_extent))
+        assert almost_equal == ((True, True), (True, True), (True, True),
+                                (True, True)), \
+            "Images have not the same extent: '{:b}' and '{:b}'".format(
+                self,
+                pan)
+        assert self._datetime == pan.datetime, \
+            "Images have not been taken at same time: '{:b}' and '{:b}'".format(
+                self,
+                pan)
         Pansharpening = otb.Registry.CreateApplication("BundleToPerfectSensor")
         Pansharpening.SetParameterString("inp", pan.filename)
-        Pansharpening.SetParameterString("inxs", self.filename)
+        Pansharpening.SetParameterString("inxs", self._filename)
         Pansharpening.SetParameterString("out", out_filename)
         # Pansharpening.SetParameterOutputImagePixelType("out", 3)
         Pansharpening.ExecuteAndWriteOutput()
@@ -571,90 +653,106 @@ class Raster():
         return Raster(out_filename)
 
     @fix_missing_proj
-    def ndvi(self, idx_red, idx_nir, out_filename):
+    def radiometric_indices(self, *indices, **kw):
+        """Writes a raster in which each band is a radiometric index given as
+        parameter
+
+        :param indices: indices to compute
+        :type indices: str
+        :param kw: keywords arguments that specify indices of needed bands
+        :returns: the ``Raster`` instance corresponding to the output file
+        """
+        RadiometricIndices = otb.Registry.CreateApplication(
+            "RadiometricIndices")
+        RadiometricIndices.SetParameterString("in", self._filename)
+        try:
+            RadiometricIndices.SetParameterInt("channels.blue",
+                                               kw['blue_idx'])
+        except KeyError:
+            pass
+        try:
+            RadiometricIndices.SetParameterInt("channels.green",
+                                               kw['green_idx'])
+        except KeyError:
+            pass
+        try:
+            RadiometricIndices.SetParameterInt("channels.red",
+                                               kw['red_idx'])
+        except KeyError:
+            pass
+        try:
+            RadiometricIndices.SetParameterInt("channels.nir",
+                                               kw['nir_idx'])
+        except KeyError:
+            pass
+        try:
+            RadiometricIndices.SetParameterInt("channels.mir", kw['mir_idx'])
+        except KeyError:
+            pass
+        RadiometricIndices.SetParameterStringList("list", list(indices))
+        RadiometricIndices.SetParameterString("out", kw['out_filename'])
+        RadiometricIndices.ExecuteAndWriteOutput()
+
+        out_raster = Raster(kw['out_filename'])
+        if self._datetime is not None:
+            out_raster.datetime = self._datetime
+        return out_raster
+
+    @fix_missing_proj
+    def ndvi(self, red_idx, nir_idx, out_filename):
         """Writes the Normalized Difference Vegetation Index (NDVI) of the
         raster into the specified output file.
 
         :param out_filename: path to the output file
         :type out_filename: str
-        :param idx_red: index of a red band (starts at 1)
-        :type idx_red: int
-        :param idx_nir: index of a near-infrared band (starts at 1)
-        :type idx_nir: int
+        :param red_idx: index of a red band (starts at 1)
+        :type red_idx: int
+        :param nir_idx: index of a near-infrared band (starts at 1)
+        :type nir_idx: int
         :returns: the ``Raster`` instance corresponding to the output file
         """
-        RadiometricIndices = otb.Registry.CreateApplication(
-            "RadiometricIndices")
-        RadiometricIndices.SetParameterString("in", self.filename)
-        RadiometricIndices.SetParameterInt("channels.red", idx_red)
-        RadiometricIndices.SetParameterInt("channels.nir", idx_nir)
-        RadiometricIndices.SetParameterStringList("list", ["Vegetation:NDVI"])
-        RadiometricIndices.SetParameterString("out", out_filename)
-        RadiometricIndices.ExecuteAndWriteOutput()
-
-        out_raster = Raster(out_filename)
-        if self.meta['datetime'] is not None:
-            out_raster.set_datetime(self.meta['datetime'])
-
-        return Raster(out_filename)
+        return self.radiometric_indices("Vegetation:NDVI",
+                                        red_idx=red_idx,
+                                        nir_idx=nir_idx,
+                                        out_filename=out_filename)
 
     @fix_missing_proj
-    def ndwi(self, idx_nir, idx_mir, out_filename):
+    def ndwi(self, nir_idx, mir_idx, out_filename):
         """Writes the Normalized Difference Vegetation Index (NDWI) of the
         raster into the given output file.
 
         :param out_filename: path to the output file
         :type out_filename: str
-        :param idx_nir: index of the near infrared band (starts at 1)
-        :type idx_nir: int
-        :param idx_mir: index of the middle infrared band (starts at 1)
-        :type idx_mir: int
+        :param nir_idx: index of the near infrared band (starts at 1)
+        :type nir_idx: int
+        :param mir_idx: index of the middle infrared band (starts at 1)
+        :type mir_idx: int
         :returns: the ``Raster`` instance corresponding to the output file
         """
-        RadiometricIndices = otb.Registry.CreateApplication(
-            "RadiometricIndices")
-        RadiometricIndices.SetParameterString("in", self.filename)
-        RadiometricIndices.SetParameterInt("channels.nir", idx_nir)
-        RadiometricIndices.SetParameterInt("channels.mir", idx_mir)
-        RadiometricIndices.SetParameterStringList("list", ["Water:NDWI"])
-        RadiometricIndices.SetParameterString("out", out_filename)
-        RadiometricIndices.ExecuteAndWriteOutput()
-
-        out_raster = Raster(out_filename)
-        if self.meta['datetime'] is not None:
-            out_raster.set_datetime(self.meta['datetime'])
-
-        return Raster(out_filename)
+        return self.radiometric_indices("Water:NDWI",
+                                        nir_idx=nir_idx,
+                                        mir_idx=mir_idx,
+                                        out_filename=out_filename)
 
     ndmi = ndwi
 
     @fix_missing_proj
-    def mndwi(self, idx_green, idx_mir, out_filename):
+    def mndwi(self, green_idx, mir_idx, out_filename):
         """Writes the Modified Normalized Difference Water Index (MNDWI) of the
         image into the given output file.
 
         :param out_filename: path to the output file
         :type out_filename: str
-        :param idx_green: index of the green band
-        :type idx_green: int
-        :param idx_mir: index of the middle infrared band
-        :type idx_mir: int
+        :param green_idx: index of the green band
+        :type green_idx: int
+        :param mir_idx: index of the middle infrared band
+        :type mir_idx: int
         :returns: the ``Raster`` instance corresponding to the output file
         """
-        RadiometricIndices = otb.Registry.CreateApplication(
-            "RadiometricIndices")
-        RadiometricIndices.SetParameterString("in", self.filename)
-        RadiometricIndices.SetParameterInt("channels.green", idx_green)
-        RadiometricIndices.SetParameterInt("channels.mir", idx_mir)
-        RadiometricIndices.SetParameterStringList("list", ["Water:MNDWI"])
-        RadiometricIndices.SetParameterString("out", out_filename)
-        RadiometricIndices.ExecuteAndWriteOutput()
-
-        out_raster = Raster(out_filename)
-        if self.meta['datetime'] is not None:
-            out_raster.set_datetime(self.meta['datetime'])
-
-        return Raster(out_filename)
+        return self.radiometric_indices("Water:MNDWI",
+                                        green_idx=green_idx,
+                                        mir_idx=mir_idx,
+                                        out_filename=out_filename)
 
     ndsi = mndwi
 
@@ -685,12 +783,12 @@ class Raster():
         """
 
         # Get the number of bands
-        d = self.meta['count']
+        d = self._count
 
         # Initialize variables
         list_raster = []
         list_file = []
-        rasters = [self.filename, mask_raster.filename]
+        rasters = [self._filename, mask_raster.filename]
         BandMath = otb.Registry.CreateApplication("BandMath")
 
         # For each band, apply the mask and create a file
@@ -715,13 +813,18 @@ class Raster():
         for fi in list_file:
             os.remove(fi)
         out_raster = Raster(out_filename)
-        out_raster.set_nodata_value(out_mask_value)
+        out_raster.nodata_value = out_mask_value
 
         return out_raster
 
-    def lsms_smoothing(self, out_smoothed_filename, spatialr, ranger,
-                       out_spatial_filename, thres=0.1, rangeramp=0,
-                       maxiter=10, modesearch=0):
+    def _lsms_smoothing(self,
+                        spatialr,
+                        ranger,
+                        thres=0.1,
+                        rangeramp=0,
+                        maxiter=10,
+                        out_spatial_filename='spatial.tif',
+                        out_smoothed_filename='smoothed.tif'):
         """First step of a Large-Scale Mean-Shift (LSMS) segmentation: performs
         a mean shift smoothing on the raster.
 
@@ -730,17 +833,11 @@ class Raster():
         http://www.orfeo-toolbox.org/CookBook/CookBooksu91.html#x122-5480005.5.2
         for more details
 
-        :param out_smoothed_filename: path to the smoothed file to be written
-        :type out_smoothed_filename: str
-        :param out_spatial_filename: path to the spatial image to be written
-        :type out_spatial_filename: str
-        :param spatialr: spatial radius of the window
+        :param spatialr: spatial radius of the window (in number of pixels)
         :type spatialr: int
         :param ranger: range radius defining the spectral window size (expressed
                        in radiometry unit)
         :type ranger: float
-        :param maxiter: maximum number of iterations in case of non-convergence
-        :type maxiter: int
         :param thres: mean shift vector threshold
         :type thres: float
         :param rangeramp: range radius coefficient. This coefficient makes
@@ -750,13 +847,20 @@ class Raster():
 
                               y = rangeramp * x + ranger
         :type rangeramp: float
+        :param maxiter: maximum number of iterations in case of non-convergence
+                        of the algorithm
+        :type maxiter: int
+        :param out_spatial_filename: path to the spatial image to be written
+        :type out_spatial_filename: str
+        :param out_smoothed_filename: path to the smoothed file to be written
+        :type out_smoothed_filename: str
         :returns: two ``Raster`` instances corresponding to the filtered image
                   and the spatial image
         :rtype: tuple of ``Raster``
         """
         MeanShiftSmoothing = otb.Registry.CreateApplication(
             "MeanShiftSmoothing")
-        MeanShiftSmoothing.SetParameterString("in", self.filename)
+        MeanShiftSmoothing.SetParameterString("in", self._filename)
         MeanShiftSmoothing.SetParameterString("fout", out_smoothed_filename)
         MeanShiftSmoothing.SetParameterString("foutpos", out_spatial_filename)
         MeanShiftSmoothing.SetParameterInt("spatialr", spatialr)
@@ -764,13 +868,17 @@ class Raster():
         MeanShiftSmoothing.SetParameterFloat("thres", thres)
         MeanShiftSmoothing.SetParameterFloat("rangeramp", rangeramp)
         MeanShiftSmoothing.SetParameterInt("maxiter", maxiter)
-        MeanShiftSmoothing.SetParameterInt("modesearch", modesearch)
+        MeanShiftSmoothing.SetParameterInt("modesearch", 0)
         MeanShiftSmoothing.ExecuteAndWriteOutput()
 
         return Raster(out_smoothed_filename), Raster(out_spatial_filename)
 
-    def lsms_segmentation(self, in_spatial_raster, out_filename, spatialr,
-                          ranger, tilesizex=256, tilesizey=256):
+    def _lsms_segmentation(self,
+                           spatialr,
+                           ranger,
+                           block_size=None,
+                           spatial_raster='spatial.tif',
+                           out_filename='labels.tif'):
         """Second step in a LSMS segmentation: performs the actual object
         segmentation on the raster. Produce an image whose pixels are given a
         label number, based on their spectral and spatial proximity.
@@ -787,26 +895,33 @@ class Raster():
         http://www.orfeo-toolbox.org/CookBook/CookBooksu121.html#x156-8990005.9.3
         for more details
 
-        :param in_spatial_raster: a spatial raster associated to this raster
-                                  (for example, as returned by the
-                                  ``lsms_smoothing`` method)
-        :type in_spatial_raster: ``Raster``
-        :param out_filename: path to the segmented image to be written
         :param spatialr: spatial radius of the window
         :type spatialr: int
         :param ranger: range radius defining the spectral window size (expressed
                        in radiometry unit)
         :type ranger: float
-        :param tilesizex: width of each tile (default: 256)
-        :type tilesizex: int
-        :param tilesizey: height of each tile (default: 256)
-        :type tilesizey: int
-        :returns: ``Raster`` instance corresponding to the segmented image
+        :param block_size: wanted size for the blocks. To save memory, the
+                          segmentation work on blocks instead of the whole
+                          raster. If None, use the natural block size of the
+                          raster.
+        :type block_size: tuple (xsize, ysize)
+        :param spatial_raster: a spatial raster associated to this raster
+                                  (for example, as returned by the
+                                  ``lsms_smoothing`` method)
+        :type spatial_raster: ``Raster``
+        :param out_filename: path to the segmented image to be written
+        :type out_filename: str
+        :returns: the raster corresponding to the labeled image
+        :rtype: ``Raster`` instance
         """
+        # Blocks size
+        tilesizex, tilesizey = block_size if block_size else self.block_size
+
+        # Actual segmentation
         LSMSSegmentation = otb.Registry.CreateApplication("LSMSSegmentation")
-        LSMSSegmentation.SetParameterString("in", self.filename)
+        LSMSSegmentation.SetParameterString("in", self._filename)
         LSMSSegmentation.SetParameterString("inpos",
-                                            in_spatial_raster.filename)
+                                            spatial_raster.filename)
         LSMSSegmentation.SetParameterString("out", out_filename)
         LSMSSegmentation.SetParameterFloat("ranger", ranger)
         LSMSSegmentation.SetParameterFloat("spatialr", spatialr)
@@ -818,9 +933,12 @@ class Raster():
         return Raster(out_filename)
 
     @fix_missing_proj
-    def lsms_merging(self, in_smoothed_raster, out_filename, minsize,
-                     tilesizex=256, tilesizey=256):
-        """Optional third step in a LSMS segmentation:  merge objects in the
+    def _lsms_merging(self,
+                      object_minsize,
+                      block_size=None,
+                      smoothed_raster='smoothed.tif',
+                      out_filename=None):
+        """Third (optional) step in a LSMS segmentation:  merge objects in the
         raster whose size in pixels is lower than a given threshold into the
         bigger enough adjacent object with closest radiometry (radiometry is
         given by the original image from which the labeled raster was computed).
@@ -839,39 +957,46 @@ class Raster():
         the LSMSSmallRegionsMerging otb application. It returns a Raster
         instance of the merged image.
 
-        :param in_smoothed_raster: smoothed raster associated to this raster
-                                   (for example, as returned by the
-                                   ``lsms_smoothing`` method)
-        :type in_smoothed_raster: ``Raster``
+        :param object_minsize: threshold defining the minimum size of an object
+        :type object_minsize: int
+        :param block_size: wanted size for the blocks. To save memory, the
+                          merging work on blocks instead of the whole
+                          raster. If None, use the natural block size of the
+                          raster.
+        :type block_size: tuple (xsize, ysize)
+        :param smoothed_raster: smoothed raster associated to this raster
+                                (for example, as returned by the
+                                ``lsms_smoothing`` method)
+        :type smoothed_raster: ``Raster`` instance
         :param out_filename: path to the merged segmented image to be written
         :type out_filename: str
-        :param minsize: threshold defining the minimum size of an object
-        :type minsize: int
-        :param tilesizex: width of each tile (default: 256)
-        :type tilesizex: int
-        :param tilesizey: height of each tile (default: 256)
-        :type tilesizey: int
         :returns: ``Raster`` instance corresponding to the merged segmented
                   image
         """
+        # Blocks size
+        tilesizex, tilesizey = block_size if block_size else self.block_size
+
+        # Actual merging
         LSMSSmallRegionsMerging = otb.Registry.CreateApplication(
             "LSMSSmallRegionsMerging")
         LSMSSmallRegionsMerging.SetParameterString("in",
-                                                   in_smoothed_raster.filename)
-        LSMSSmallRegionsMerging.SetParameterString("inseg", self.filename)
+                                                   smoothed_raster.filename)
+        LSMSSmallRegionsMerging.SetParameterString("inseg", self._filename)
         LSMSSmallRegionsMerging.SetParameterString("out", out_filename)
-        LSMSSmallRegionsMerging.SetParameterInt("minsize", minsize)
+        LSMSSmallRegionsMerging.SetParameterInt("minsize", object_minsize)
         LSMSSmallRegionsMerging.SetParameterInt("tilesizex", tilesizex)
         LSMSSmallRegionsMerging.SetParameterInt("tilesizey", tilesizey)
         LSMSSmallRegionsMerging.ExecuteAndWriteOutput()
 
         return Raster(out_filename)
 
-    def lsms_vectorization(self, orig_raster, out_filename, tilesizex=256,
-                           tilesizey=256):
-        """Last step in a LSMS segmentation: vectorize a labeled segmented
-        image, turn each object into a polygon. Each polygon will have some
-        attribute data:
+    def _lsms_vectorization(self,
+                            orig_raster,
+                            block_size=None,
+                            out_filename='labels.shp'):
+        """Fourth and Last (optional) step in a LSMS segmentation: vectorize a
+        labeled segmented image, turn each object into a polygon. Each polygon
+        will have some attribute data:
 
             * the label number as an attribute,
             * the object's mean for each band in the original image,
@@ -890,55 +1015,130 @@ class Raster():
         LSMSVectorization otb application.
 
         :param orig_raster: original raster from which the segmentation was
-                             computed
+                            computed
+        :type orig_raster: ``Raster`` instance
+        :param block_size: wanted size for the blocks. To save memory, the
+                          vectorization work on blocks instead of the whole
+                          raster. If None, use the natural block size of the
+                          raster.
+        :type block_size: tuple (xsize, ysize)
         :param out_filename: path to the output vector file
-        :param tilesizex: width of each tile (default: 256)
-        :type tilesizex: int
-        :param tilesizey: height of each tile (default: 256)
-        :type tilesizey: int
         """
+        # Blocks size
+        tilesizex, tilesizey = block_size \
+            if block_size \
+            else orig_raster.block_size
+
+        # Actual vectorization
         LSMSVectorization = otb.Registry.CreateApplication(
             "LSMSVectorization")
         LSMSVectorization.SetParameterString("in", orig_raster.filename)
-        LSMSVectorization.SetParameterString("inseg", self.filename)
+        LSMSVectorization.SetParameterString("inseg", self._filename)
         LSMSVectorization.SetParameterString("out", out_filename)
         LSMSVectorization.SetParameterInt("tilesizex", tilesizex)
         LSMSVectorization.SetParameterInt("tilesizey", tilesizey)
         LSMSVectorization.ExecuteAndWriteOutput()
 
-    def lsms(self, spatialr, ranger, maxiter, thres, rangeramp,
-             output_filtered_image, output_spatial_image, output_seg_image,
-             output_merged, minsize, output_vector, m_step=True):
-        img_smoothed, img_pos = self.lsms_smoothing(output_filtered_image,
-                                                    spatialr,
-                                                    ranger,
-                                                    maxiter,
-                                                    thres,
-                                                    rangeramp,
-                                                    output_spatial_image)
+    def lsms_segmentation(self,
+                          spatialr,
+                          ranger,
+                          thres=0.1,
+                          rangeramp=0,
+                          maxiter=10,
+                          object_minsize=None,
+                          out_vector_filename=None,
+                          out_filename='labels.tif'):
+        """Performs a Large-Scale-Mean-Shift (LSMS) object segmentation on the
+        raster.
 
-        print("smoothing step has been realized succesfully")
+        Produces an image whose pixel values are label numbers, one label per
+        object.
 
-        img_seg = img_smoothed.lsms_seg(img_pos, output_seg_image, spatialr,
-                                        ranger)
+        Optionally, if the out_vector_filename parameter is given, then also
+        writes a shapefile where each polygon is an object with its label number
+        as an attribute.
 
-        print("segmentation step has been realized succesfully")
+        :param spatialr: the algorithm compute the segmentation with a floating
+                         window which browse the image. This parameter specify
+                         the spatial radius of the window (in number of pixels)
+        :type spatialr: int
+        :param ranger: spectral range radius (expressed in radiometry unit).
+                       This says how objects are computed.
+        :type ranger: float
+        :param thres: mean shift vector threshold
+        :type thres: float
+        :param rangeramp: range radius coefficient. This coefficient makes
+                          dependent the ``ranger`` of the colorimetry of the
+                          filtered pixel:
+                          .. math::
 
-        if m_step:
-            img_merged = img_seg.lsms_merging(img_smoothed, output_merged,
-                                              minsize)
+                              y = rangeramp * x + ranger
+        :type rangeramp: float
+        :param maxiter: maximum number of iterations in case of non-convergence
+                        of the algorithm
+        :type maxiter: int
+        :param object_minsize: threshold defining the minimum size in pixel of
+                               an object. If given, objects smaller than this
+                               size will be merged into bigger objects.
+        :type object_minsize: int
+        :param tilesizex: horizontal size of each tile. To save memory, the
+                          segmentation work on tiles instead of the whole image.
+                          If None, use the natural tile size of the image.
+        :type tilesizex: int
+        :param tilesizey: vertical size of each tile. If None, use the natural
+                          tile size of the image.
+        :type tilesizey: int
 
-            print("merging step has been realized succesfully")
+        """
 
-            img_merged.lsms_vectorisation(self, output_vector)
+        # Temp filenames
+        tmpdir = gettempdir()
+        out_smoothed_filename = os.path.join(
+            tmpdir, '{:b}_smoothed.tif'.format(self))
+        out_spatial_filename = os.path.join(
+            tmpdir, '{:b}_spatial.tif'.format(self))
+        out_label_filename = os.path.join(
+            tmpdir, '{:b}_labels.tif'.format(self))
 
-            print("vectorisation step has been realized succesfully")
+        # First step: smoothing
+        smoothed_raster, spatial_raster = self._lsms_smoothing(
+            spatialr=spatialr,
+            ranger=ranger,
+            thres=thres,
+            rangeramp=rangeramp,
+            maxiter=maxiter,
+            out_smoothed_filename=out_smoothed_filename,
+            out_spatial_filename=out_spatial_filename)
 
+        # Second step: actual object segmentation
+        label_raster = smoothed_raster._lsms_segmentation(
+            spatialr=spatialr,
+            ranger=ranger,
+            spatial_raster=spatial_raster,
+            out_filename=out_label_filename)
+
+        # Optional third step: merge small objects (< minsize) into bigger ones
+        if object_minsize:
+            label_raster._lsms_merging(
+                object_minsize=object_minsize,
+                smoothed_raster=smoothed_raster,
+                out_filename=out_filename)
         else:
+            pass
 
-            img_seg.lsms_vectorisation(self, output_vector)
+        # Optional fourth step: convert into vector
+        if out_vector_filename:
+            out_raster = Raster(out_filename)
+            out_raster._lsms_vectorization(
+                orig_raster=self,
+                out_filename=out_vector_filename)
 
-            print "vectorisation step has been realized succesfully"
+        # Remove temp files
+        for filename in (out_smoothed_filename, out_spatial_filename,
+                         out_label_filename):
+            os.remove(filename)
+
+        return Raster(out_filename)
 
     def get_stat(self,
                  orig_raster,
@@ -978,7 +1178,7 @@ class Raster():
         Projection = data.GetProjection()
 
         # load the label file and sort his values
-        label = gdal.Open(self.filename)
+        label = gdal.Open(self._filename)
         L = label.GetRasterBand(1).ReadAsArray()
         L_sorted = np.unique(L)
 

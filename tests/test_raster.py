@@ -6,7 +6,7 @@ import tempfile
 
 from ymraster import write_file, concatenate_images, Raster
 from ymraster.dtype import RasterDataType
-from osgeo import gdal, ogr, osr
+from osgeo import ogr, osr
 import numpy as np
 
 import re
@@ -29,20 +29,20 @@ def write_file_unique_value(filename,
     write_file(filename, drivername='GTiff', dtype=dtype, array=array)
 
 
-def _check_output_image(tester,
-                        filename,
-                        driver,
-                        width,
-                        height,
-                        number_bands,
-                        dtype,
-                        proj=None,
-                        transform=None,
-                        datetime=None,
-                        min_=None,
-                        max_=None,
-                        mean=None,
-                        stddev=None):
+def _check_image(tester,
+                 filename,
+                 driver,
+                 width,
+                 height,
+                 number_bands,
+                 dtype,
+                 proj=None,
+                 transform=None,
+                 datetime=None,
+                 min_=None,
+                 max_=None,
+                 mean=None,
+                 stddev=None):
     info = subprocess.check_output(["gdalinfo", "-stats", "-proj4",
                                     filename]).decode('utf-8')
     tester.assertRegexpMatches(info, u'Driver: {}'.format(driver))
@@ -78,17 +78,17 @@ class TestArrayToRaster(unittest.TestCase):
                                 number_bands,
                                 dtype,
                                 value)
-        _check_output_image(self,
-                            out_file.name,
-                            u'GTiff',
-                            width,
-                            height,
-                            number_bands,
-                            dtype.ustr_dtype,
-                            min_=value,
-                            max_=value,
-                            mean=value,
-                            stddev=0)
+        _check_image(self,
+                     out_file.name,
+                     u'GTiff',
+                     width,
+                     height,
+                     number_bands,
+                     dtype.ustr_dtype,
+                     min_=value,
+                     max_=value,
+                     mean=value,
+                     stddev=0)
 
     def testwrite_file_three_band_square_uint16_image(self):
         width = 400
@@ -103,17 +103,17 @@ class TestArrayToRaster(unittest.TestCase):
                                 number_bands,
                                 dtype,
                                 value)
-        _check_output_image(self,
-                            out_file.name,
-                            u'GTiff',
-                            width,
-                            height,
-                            number_bands,
-                            dtype.ustr_dtype,
-                            min_=value,
-                            max_=value,
-                            mean=value,
-                            stddev=0)
+        _check_image(self,
+                     out_file.name,
+                     u'GTiff',
+                     width,
+                     height,
+                     number_bands,
+                     dtype.ustr_dtype,
+                     min_=value,
+                     max_=value,
+                     mean=value,
+                     stddev=0)
 
     def testwrite_file_three_band_rectangle_uint16_image(self):
         width = 800
@@ -128,17 +128,17 @@ class TestArrayToRaster(unittest.TestCase):
                                 number_bands,
                                 dtype,
                                 value)
-        _check_output_image(self,
-                            out_file.name,
-                            u'GTiff',
-                            width,
-                            height,
-                            number_bands,
-                            dtype.ustr_dtype,
-                            min_=value,
-                            max_=value,
-                            mean=value,
-                            stddev=0)
+        _check_image(self,
+                     out_file.name,
+                     u'GTiff',
+                     width,
+                     height,
+                     number_bands,
+                     dtype.ustr_dtype,
+                     min_=value,
+                     max_=value,
+                     mean=value,
+                     stddev=0)
 
     def testwrite_file_should_raise_value_error_if_value_out_of_range(self):
         width = 3
@@ -258,7 +258,7 @@ class TestRaster(unittest.TestCase):
     def test_raster_should_get_array_one_band(self):
         filename = 'data/RGB.byte.tif'
         raster = Raster(filename)
-        array = raster.array(idx_band=1)
+        array = raster.array(band_idx=1)
         self.assertEqual(array.ndim, 2)
         self.assertEqual(array.shape, (718, 791))
         self.assertEqual(array.dtype, 'UInt8')
@@ -274,7 +274,7 @@ class TestRaster(unittest.TestCase):
     def test_raster_should_get_array_block_one_band(self):
         filename = 'data/RGB.byte.tif'
         raster = Raster(filename)
-        array = raster.array(idx_band=2, block_win=(256, 256, 128, 128))
+        array = raster.array(band_idx=2, block_win=(256, 256, 128, 128))
         self.assertEqual(array.ndim, 2)
         self.assertEqual(array.shape, (128, 128))
         self.assertEqual(array.dtype, 'UInt8')
@@ -284,19 +284,19 @@ class TestRaster(unittest.TestCase):
         tmp_file = tempfile.NamedTemporaryFile(suffix='.tif')
         shutil.copyfile(filename, tmp_file.name)
         raster = Raster(tmp_file.name)
-        self.assertIsNone(raster.meta['srs'])
-        srs = osr.SpatialReference()
-        srs.ImportFromEPSG(4326)
-        raster.set_projection(srs)
-        _check_output_image(self,
-                            tmp_file.name,
-                            u'GTiff',
-                            791,
-                            718,
-                            3,
-                            'Byte',
-                            proj=srs.ExportToProj4())
-        self.assertEqual(raster.meta['srs'], srs)
+        self.assertIsNone(raster.srs)
+        sr = osr.SpatialReference()
+        sr.ImportFromEPSG(4326)
+        raster.srs = sr
+        _check_image(self,
+                     tmp_file.name,
+                     u'GTiff',
+                     791,
+                     718,
+                     3,
+                     'Byte',
+                     proj=sr.ExportToProj4())
+        self.assertTrue(raster.meta['srs'].IsSame(sr))
 
     def test_raster_should_set_date(self):
         filename = 'data/RGB_unproj.byte.tif'
@@ -305,15 +305,15 @@ class TestRaster(unittest.TestCase):
         raster = Raster(tmp_file.name)
         self.assertIsNone(raster.meta['datetime'])
         dt = datetime(2014, 01, 01)
-        raster.set_datetime(dt)
-        _check_output_image(self,
-                            tmp_file.name,
-                            u'GTiff',
-                            791,
-                            718,
-                            3,
-                            'Byte',
-                            datetime=dt.strftime('%Y:%m:%d %H:%M:%S'))
+        raster.datetime = dt
+        _check_image(self,
+                     tmp_file.name,
+                     u'GTiff',
+                     791,
+                     718,
+                     3,
+                     'Byte',
+                     datetime=dt.strftime('%Y:%m:%d %H:%M:%S'))
         self.assertEqual(raster.meta['datetime'], dt)
 
 
@@ -328,29 +328,29 @@ class TestConcatenateImages(unittest.TestCase):
                    if filename.startswith('l8_')
                    and filename.endswith('.tif')]
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
-        concatenate_images(rasters, out_file.name)
-        _check_output_image(tester=self,
-                            filename=out_file.name,
-                            driver=u'GTiff',
-                            width=rasters[0].meta['width'],
-                            height=rasters[0].meta['height'],
-                            number_bands=rasters[0].meta['count'] * 8,
-                            dtype=rasters[0].meta['dtype'].ustr_dtype,
-                            proj=rasters[0].meta['srs'].ExportToProj4())
+        concatenate_images(*rasters, out_filename=out_file.name)
+        _check_image(tester=self,
+                     filename=out_file.name,
+                     driver=u'GTiff',
+                     width=rasters[0].meta['width'],
+                     height=rasters[0].meta['height'],
+                     number_bands=rasters[0].meta['count'] * 8,
+                     dtype=rasters[0].meta['dtype'].ustr_dtype,
+                     proj=rasters[0].meta['srs'].ExportToProj4())
 
     def test_concatenate_should_raise_assertion_error_if_not_same_extent(self):
         rasters = [Raster(os.path.join(self.folder, 'shade.tif')),
                    Raster(os.path.join(self.folder, 'shade_crop.tif'))]
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
-        self.assertRaises(AssertionError, concatenate_images, rasters,
-                          out_file.name)
+        self.assertRaises(AssertionError, concatenate_images, *rasters,
+                          outfilename=out_file.name)
 
     def test_concatenate_should_raise_assertion_error_if_not_same_proj(self):
         rasters = [Raster(os.path.join(self.folder, 'RGB.byte.tif')),
                    Raster(os.path.join(self.folder, 'RGB_unproj.byte.tif'))]
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
-        self.assertRaises(AssertionError, concatenate_images, rasters,
-                          out_file.name)
+        self.assertRaises(AssertionError, concatenate_images, *rasters,
+                          out_filename=out_file.name)
 
 
 class TestFusion(unittest.TestCase):
@@ -358,20 +358,20 @@ class TestFusion(unittest.TestCase):
     def setUp(self):
         self.ms = Raster('data/Spot6_MS_31072013.tif')
 
-    def test_fusion_should_work_if_same_date_same_projection(self):
+    def test_fusion_should_work_if_same_date_same_extent(self):
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
         pan = Raster('data/Spot6_Pan_31072013.tif')
         self.ms.fusion(pan, out_file.name)
-        _check_output_image(tester=self,
-                            filename=out_file.name,
-                            driver=u'GTiff',
-                            width=pan.meta['width'],
-                            height=pan.meta['height'],
-                            number_bands=self.ms.meta['count'],
-                            dtype='Float32',
-                            proj=self.ms.meta['srs'].ExportToProj4())
+        _check_image(tester=self,
+                     filename=out_file.name,
+                     driver=u'GTiff',
+                     width=pan.meta['width'],
+                     height=pan.meta['height'],
+                     number_bands=self.ms.meta['count'],
+                     dtype='Float32',
+                     proj=self.ms.meta['srs'].ExportToProj4())
 
-    def test_fusion_should_raise_assertion_error_if_not_same_proj(self):
+    def test_fusion_should_raise_assertion_error_if_not_same_extent(self):
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
         pan = Raster('data/Spot6_Pan_31072013_unproj.tif')
         self.assertRaises(AssertionError, self.ms.fusion, pan,
@@ -393,130 +393,84 @@ class TestOtbFunctions(unittest.TestCase):
 
     def test_should_remove_band(self):
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
-        result = self.raster.remove_band(6, out_filename=out_file.name)
+        result = self.raster.remove_bands(6, out_filename=out_file.name)
         self.assertEqual(result.meta['count'], self.raster.meta['count'] - 1)
-        _check_output_image(tester=self,
-                            filename=out_file.name,
-                            driver=u'GTiff',
-                            width=self.raster.meta['width'],
-                            height=self.raster.meta['height'],
-                            number_bands=self.raster.meta['count'] - 1,
-                            dtype=self.raster.meta['dtype'].ustr_dtype,
-                            proj=self.raster.meta['srs'].ExportToProj4())
+        _check_image(tester=self,
+                     filename=out_file.name,
+                     driver=u'GTiff',
+                     width=self.raster.meta['width'],
+                     height=self.raster.meta['height'],
+                     number_bands=self.raster.meta['count'] - 1,
+                     dtype=self.raster.meta['dtype'].ustr_dtype,
+                     proj=self.raster.meta['srs'].ExportToProj4())
 
     def test_should_compute_ndvi(self):
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
-        self.raster.ndvi(idx_red=4, idx_nir=5, out_filename=out_file.name)
-        _check_output_image(tester=self,
-                            filename=out_file.name,
-                            driver=u'GTiff',
-                            width=self.raster.meta['width'],
-                            height=self.raster.meta['height'],
-                            number_bands=1,
-                            dtype='Float32',
-                            datetime=self.raster.meta['datetime'],
-                            proj=self.raster.meta['srs'].ExportToProj4())
+        self.raster.ndvi(red_idx=4, nir_idx=5, out_filename=out_file.name)
+        _check_image(tester=self,
+                     filename=out_file.name,
+                     driver=u'GTiff',
+                     width=self.raster.meta['width'],
+                     height=self.raster.meta['height'],
+                     number_bands=1,
+                     dtype='Float32',
+                     datetime=self.raster.meta['datetime'],
+                     proj=self.raster.meta['srs'].ExportToProj4())
 
     def test_should_compute_ndwi(self):
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
-        self.raster.ndwi(idx_nir=4, idx_mir=5, out_filename=out_file.name)
-        _check_output_image(tester=self,
-                            filename=out_file.name,
-                            driver=u'GTiff',
-                            width=self.raster.meta['width'],
-                            height=self.raster.meta['height'],
-                            number_bands=1,
-                            dtype='Float32',
-                            datetime=self.raster.meta['datetime'],
-                            proj=self.raster.meta['srs'].ExportToProj4())
+        self.raster.ndwi(nir_idx=4, mir_idx=5, out_filename=out_file.name)
+        _check_image(tester=self,
+                     filename=out_file.name,
+                     driver=u'GTiff',
+                     width=self.raster.meta['width'],
+                     height=self.raster.meta['height'],
+                     number_bands=1,
+                     dtype='Float32',
+                     datetime=self.raster.meta['datetime'],
+                     proj=self.raster.meta['srs'].ExportToProj4())
 
     def test_should_compute_mndwi(self):
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
-        self.raster.mndwi(idx_green=4, idx_mir=5, out_filename=out_file.name)
-        _check_output_image(tester=self,
-                            filename=out_file.name,
-                            driver=u'GTiff',
-                            width=self.raster.meta['width'],
-                            height=self.raster.meta['height'],
-                            number_bands=1,
-                            dtype='Float32',
-                            datetime=self.raster.meta['datetime'],
-                            proj=self.raster.meta['srs'].ExportToProj4())
+        self.raster.mndwi(green_idx=4, mir_idx=5, out_filename=out_file.name)
+        _check_image(tester=self,
+                     filename=out_file.name,
+                     driver=u'GTiff',
+                     width=self.raster.meta['width'],
+                     height=self.raster.meta['height'],
+                     number_bands=1,
+                     dtype='Float32',
+                     datetime=self.raster.meta['datetime'],
+                     proj=self.raster.meta['srs'].ExportToProj4())
 
     def test_lsms_segmentation_should_compute_segmented_image(self):
-        # Compute and check first step (smoothing)
-        out_file_smoothed = tempfile.NamedTemporaryFile(suffix='.tif')
-        out_file_spatial = tempfile.NamedTemporaryFile(suffix='.tif')
-        filtered, spatial = self.raster.lsms_smoothing(
-            out_smoothed_filename=out_file_smoothed.name,
+        out_file = tempfile.NamedTemporaryFile(suffix='.tif')
+        out_vector_filename = os.path.join(
+            tempfile.gettempdir(), 'labels.shp')
+        out_raster = self.raster.lsms_segmentation(
             spatialr=5,
             ranger=15,
-            maxiter=5,
             thres=0.1,
             rangeramp=0,
-            out_spatial_filename=out_file_spatial.name)
-        _check_output_image(tester=self,
-                            filename=out_file_smoothed.name,
-                            driver=u'GTiff',
-                            width=self.raster.meta['width'],
-                            height=self.raster.meta['height'],
-                            number_bands=self.raster.meta['count'],
-                            dtype='Float32',
-                            proj=self.raster.meta['srs'].ExportToProj4())
-        _check_output_image(tester=self,
-                            filename=out_file_spatial.name,
-                            driver=u'GTiff',
-                            width=self.raster.meta['width'],
-                            height=self.raster.meta['height'],
-                            number_bands=2,
-                            dtype='Float32',
-                            proj=self.raster.meta['srs'].ExportToProj4())
+            maxiter=5,
+            object_minsize=10,
+            out_vector_filename=out_vector_filename,
+            out_filename=out_file.name)
 
-        # Compute and check second step (segmentation)
-        out_file_segmented = tempfile.NamedTemporaryFile(suffix='.tif')
-        segmented = filtered.lsms_segmentation(
-            in_spatial_raster=spatial,
-            out_filename=out_file_segmented.name,
-            spatialr=5,
-            ranger=15)
-        _check_output_image(tester=self,
-                            filename=out_file_segmented.name,
-                            driver=u'GTiff',
-                            width=self.raster.meta['width'],
-                            height=self.raster.meta['height'],
-                            number_bands=1,
-                            dtype='Float32',
-                            proj=self.raster.meta['srs'].ExportToProj4())
+        # Output raster should have same size, same proj, 1 band
+        _check_image(tester=self,
+                     filename=out_file.name,
+                     driver=u'GTiff',
+                     width=self.raster.meta['width'],
+                     height=self.raster.meta['height'],
+                     number_bands=1,
+                     dtype='Float32',
+                     proj=self.raster.meta['srs'].ExportToProj4())
 
-        # Compute and check third step (merging)
-        out_file_segmented_merged = tempfile.NamedTemporaryFile(suffix='.tif')
-        segmented_merged = segmented.lsms_merging(
-            in_smoothed_raster=filtered,
-            out_filename=out_file_segmented_merged.name,
-            minsize=10)
-        _check_output_image(tester=self,
-                            filename=out_file_segmented_merged.name,
-                            driver=u'GTiff',
-                            width=self.raster.meta['width'],
-                            height=self.raster.meta['height'],
-                            number_bands=1,
-                            dtype='Float32',
-                            proj=self.raster.meta['srs'].ExportToProj4())
-
-        # Compute and check fourth step (vectorization) by comparing:
-        # number of labels and projections
-        out_segmented_merged_shp_filename = os.path.join(tempfile.gettempdir(),
-                                                         'segmented_merged.shp')
-        segmented_merged.lsms_vectorization(
-            orig_raster=self.raster,
-            out_filename=out_segmented_merged_shp_filename)
-
-        ds = gdal.Open(segmented_merged.filename, gdal.GA_ReadOnly)
-        band = ds.GetRasterBand(1)
-        array = np.array(band.ReadAsArray())
+        # Output vector should have same number of polygon than label
+        array = out_raster.array()
         number_labels = len(np.unique(array))
-
-        ds = ogr.Open(out_segmented_merged_shp_filename)
+        ds = ogr.Open(out_vector_filename)
         layer = ds.GetLayer(0)
         self.assertEqual(layer.GetFeatureCount(), number_labels)
 
