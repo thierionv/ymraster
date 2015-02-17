@@ -9,6 +9,9 @@ from osgeo import gdal
 from ymraster import Raster, write_file
 from ymraster.dtype import RasterDataType
 from sklearn import tree
+import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix, classification_report,\
+                             accuracy_score
 
 def get_samples_from_roi(in_rst_label,in_rst_roi,in_rst_stat ):
     '''
@@ -236,3 +239,23 @@ def decision_tree(X_train, Y_train, X_test, X_img, reverse_array, raster,
                  srs= proj, transform=geotransform)
                  
     return y_predict
+
+def pred_error_metrics(Y_predict, Y_test, target_names = None):
+    """
+    """
+    #Compute the confusion matric
+    cm = confusion_matrix(Y_test, Y_predict)
+        
+    # Show confusion matrix in a separate window
+    plt.matshow(cm)
+    plt.title('Confusion matrix')
+    plt.colorbar()
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
+    plt.show()
+    
+    #Compute the main classification metrics 
+    report = classification_report(Y_test, Y_predict, target_names = target_names)
+    accuracy = accuracy_score(Y_test, Y_predict)
+    
+    return cm, report, accuracy
