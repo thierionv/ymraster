@@ -207,7 +207,7 @@ def decision_tree(X_train, Y_train, X_test, X_img, reverse_array, raster,
     :param ext: Format of the output image to be written. Any formats
                 supported by GDAL. The default value is 'Gtiff'.
     :returns:
-            y_predict: The classes predicted for the validation dataset, in a 
+            y_predict: The classes predicted from the validation dataset, in a 
                         vertical n matrix. It is useful to compute prediction 
                         error metrics.
     """
@@ -241,9 +241,24 @@ def decision_tree(X_train, Y_train, X_test, X_img, reverse_array, raster,
     return y_predict
 
 def pred_error_metrics(Y_predict, Y_test, target_names = None):
+    """This function calcul the main classification metrics and compute and 
+    display confusion matrix.
+    
+    :param Y_predict: Vertical n matrix correspind to the estimated targets as
+                    returned by a classifier.
+    :param Y_test: Vertical n matrix corresponding to the ground truth 
+                    (correct) target values.
+    :param target_names: List of string that contains the names of the classes.
+    
+    :returns:
+            cm : Array of the confusion matrix.
+            report : Text summary of the precision, recall, F1 score for each 
+                    class.
+            accuracy: float, If normalize == True, return the correctly 
+                        classified samples (float), else it returns the number
+                        of correctly classified samples (int).
     """
-    """
-    #Compute the confusion matric
+    #Compute the confusion matrix
     cm = confusion_matrix(Y_test, Y_predict)
         
     # Show confusion matrix in a separate window
