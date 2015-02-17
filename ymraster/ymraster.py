@@ -886,10 +886,19 @@ class Raster(Sized):
         :param set_value: the value to set in the raster where a pixel have
                           been masked
         """
+        # Check for extent
+        assert self.has_same_extent(mask_raster), \
+            "Images have not the same extent: '{:f}' and '{:f}'".format(
+                self,
+                mask_raster)
+
         # Set value
-        set_value = set_value \
-            if set_value \
-            else np.iinfo(self.dtype.numpy_dtype).max
+        try:
+            set_value = set_value \
+                if set_value \
+                else np.iinfo(self.dtype.numpy_dtype).max
+        except ValueError:
+            set_value = np.finfo(self.dtype.numpy_dtype).max
 
         # Out file
         out_filename = kw['out_filename'] \
@@ -911,8 +920,8 @@ class Raster(Sized):
             BandMath.SetParameterString("exp", expr)
             BandMath.ExecuteAndWriteOutput()
         # Then concatenate all masked bands and indicate the nodata_value
-        masked_bands = [os.path.join(gettempdir(),
-                                     'mono_masked_{}.tif'.format(i))
+        masked_bands = [Raster(os.path.join(gettempdir(),
+                                            'mono_masked_{}.tif'.format(i)))
                         for i in range(self._count)]
         concatenate_rasters(*masked_bands, out_filename=out_filename)
         out_raster = Raster(out_filename)
@@ -1262,11 +1271,10 @@ class Raster(Sized):
 
         return Raster(out_filename)
 
-    def raster_label_stats(self,
-                           stats=['mean', 'std', 'min', 'max', "per:20",
-                                  'per:40', 'median', 'per:60', 'per:80'],
-                           label_raster='labels.tif',
-                           **kw):
+    def label_stats(self,
+                    stats=['mean', 'std', 'min', 'max', "per:20",
+                           'per:40', 'median', 'per:60', 'per:80'],
+                    **kw):
         """Compute statistics of the labels from a label image and raster. The
         statistics calculated by default are : mean, standard deviation, min,
         max and the 20, 40, 50, 60, 80th percentiles. The output is an image
@@ -1293,7 +1301,10 @@ class Raster(Sized):
         meta['dtype'] = rdtype.RasterDataType(gdal_dtype=gdal.GDT_Float64)
         write_file(out_filename, overwrite=True, **self.meta)
 
-        # Get label array and unique labels
+        # Get label array from label file and unique labels
+        label_raster = kw['label_raster'] \
+            if 'label_raster' in kw and kw['label_raster'] \
+            else None
         label_array = label_raster.array_from_bands()
         unique_labels_array = np.unique(label_array)
 
