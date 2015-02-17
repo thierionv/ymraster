@@ -491,6 +491,17 @@ class Raster(Sized):
         # Close file
         ds = None
 
+    def has_same_extent(self, raster, prec=0.01):
+        """Returns True if the raster and the other one has same extent, that is
+        the boundaries lives within the same precision.
+        """
+        extents_almost_equals = tuple(
+            map(lambda t1, t2: (abs(t1[0] - t2[0]) <= prec,
+                                abs(t1[1] - t2[1]) <= prec),
+                self._gdal_extent, raster.gdal_extent))
+        return extents_almost_equals == ((True, True), (True, True),
+                                         (True, True), (True, True))
+
     def block_windows(self, block_size=None):
         """Returns an iterator that yields successive block windows of the given
         size for the raster.
@@ -699,12 +710,7 @@ class Raster(Sized):
         :returns: the ``Raster`` instance corresponding to the output file
         """
         # Check extents
-        extents_almost_equals = tuple(
-            map(lambda t1, t2: (abs(t1[0] - t2[0]) <= 0.01,
-                                abs(t1[1] - t2[1]) <= 0.01),
-                self._gdal_extent, pan.gdal_extent))
-        assert extents_almost_equals == ((True, True), (True, True),
-                                         (True, True), (True, True)), \
+        assert self.has_same_extent(pan), \
             "Images have not the same extent: '{:f}' and '{:f}'".format(
                 self,
                 pan)
@@ -880,6 +886,11 @@ class Raster(Sized):
         :param set_value: the value to set in the raster where a pixel have
                           been masked
         """
+        # Set value
+        set_value = set_value \
+            if set_value \
+            else np.iinfo(self.dtype.numpy_dtype).max
+
         # Out file
         out_filename = kw['out_filename'] \
             if 'out_filename' in kw and kw['out_filename'] \
