@@ -11,7 +11,7 @@ IMG = '../tests/data/Spot6_MS_31072013.tif'
 
 def main():
     raster = Raster(IMG)
-    raster.ndvi('/tmp/spot6_ndvi.tif', 3, 4)
+    raster.ndvi(3, 4, '/tmp/spot6_ndvi.tif')
 
 
 if __name__ == '__main__':

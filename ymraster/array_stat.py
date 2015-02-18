@@ -13,7 +13,7 @@ _STATS = [
     'range',
     'quartile1',
     'quartile3',
-    'percentile',
+    'per',
 ]
 
 _SUMMARY_STAT_FUNC = {}

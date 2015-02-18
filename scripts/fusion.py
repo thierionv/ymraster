@@ -1,46 +1,33 @@
+#!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
-"""
-Created on Mon Jan 19 14:40:55 2015
 
-@author: sig
-"""
+import argparse
+from ymraster import Raster
+
+
+def command_line_arguments():
+    parser = argparse.ArgumentParser(
+        description="Merge a raster with its associated panchromatic image in "
+        "order to improve its resolution")
+    parser.add_argument("raster",
+                        help="Path to the raster to sharpen")
+    parser.add_argument("-p", "--pan_file", required=True,
+                        help="Path to the panchromatic image")
+    parser.add_argument("-o", "--out_file",
+                        help="Path to the output file. "
+                        "The original raster is overwritten if omitted")
+    return parser.parse_args()
+
+
+def pan_sharpen(args):
+    raster = Raster(args.raster)
+    pan_raster = Raster(args.pan_file)
+    raster.fusion(pan_raster, out_filename=args.out_file)
+
+
+def main():
+    args = command_line_arguments()
+    pan_sharpen(args)
 
 if __name__ == "__main__":
-    """Executable of the fusion part
-    """
-    
-    import argparse
-    import os
-    from ymraster import *
-    
-    #Set of the parse arguments
-    parser = argparse.ArgumentParser(description= "Write the merge result " +  
-    "between the two images of a bundle, using the BundleToPerfectSensor" + 
-    "OTB application" + "\n" +
-    "Example : python fusion.py ../../Donnees/Donnes_supp/" +
-    "Spot6_Pan_31072013.tif ../../Donnees/Donnes_supp/Spot6_MS_31072013.tif" +
-    " -pref A -dir data_example_seg")
-    parser.add_argument("--pan_file", "-pan", help="Path of the panchromatic "+
-                        "image", required = True)
-    parser.add_argument("--xs_file","-xs", help="Path of the multi-spectral " +
-                        "image", required = True)
-    parser.add_argument("-out", "--out_file", help ="Name of the output file",
-                        required = True, type = str)
-    parser.add_argument("-d","--dir", default = "", help = "Path of the " +
-                        "folder where the output will be written.")
-    args = parser.parse_args()
-    print args
-
-    
-    
-    #set of the instances and the output file name    
-    spot_xs = Raster(args.xs_file)
-    spot_pan = Raster(args.pan_file)
-    output_fusion = os.path.join(args.dir, args.out_file)
-    
-    #Execution of the method
-    fus_img = spot_xs.fusion(spot_pan,output_fusion)
-    print "Fusion has been realized succesfully\n" 
-    
-
-
+    main()

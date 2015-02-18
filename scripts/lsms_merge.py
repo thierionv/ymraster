@@ -1,54 +1,43 @@
+#!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
-"""
-Created on Mon Jan 26 18:15:27 2015
 
-@author: sig
-"""
+from ymraster import Raster
+
+import argparse
+
+
+def command_line_arguments():
+    parser = argparse.ArgumentParser(
+        description="Merge small objects of a labelled raster into bigger "
+        "adjacent objects.\n\n"
+        "This is the optional third step of a Large-Scale-Mean-Shift (LSMS) "
+        "object segmentation. It makes use of the smoothed image produce by "
+        "the first step (smoothing) to determine in which adjacent bigger "
+        "object the small one will be merged.")
+    parser.add_argument("raster",
+                        help="Path to the labeled raster to merge.")
+    parser.add_argument("-s", "--smoothed_file", required=True,
+                        help="Path to the smoothed image that was used to "
+                        "produce the labeled raster.")
+    parser.add_argument("-m", "--minsize", type=int, required=True,
+                        help="Minimum size of an object/label")
+    parser.add_argument("-o", "--out_file",
+                        help="Path to the output file. "
+                        "The original labeled file is overwritten if omitted")
+    return parser.parse_args()
+
+
+def lsms_merge(args):
+    raster = Raster(args.raster)
+    smoothed_raster = Raster(args.smoothed_file)
+    raster._lsms_merging(args.minsize, smoothed_raster,
+                         out_filename=args.out_file)
+
+
+def main():
+    args = command_line_arguments()
+    lsms_merge(args)
+
 
 if __name__ == "__main__":
-    """
-    """
-    import argparse
-    import os
-    from ymraster import *
-     
-    #Set of the parse arguments
-    parser = argparse.ArgumentParser(description= "Third step LSMS :  merge " +
-                                    "regions, whose size in pixels is lower " +
-                                    "than minsize parameter, with" +
-                                    " the adjacent region with the " +
-                                    "closest radiometry and acceptable size, "+
-                                    "using the LSMSSmallRegionsMerging otb " +
-                                    "application. It returns  the merged " +
-                                    "image.")
-    parser.add_argument("--seg_file", "-seg", help="Path of the segmented "+
-                        "image.",required = True)
-    parser.add_argument("--filtered_file", "-fil", help="Path of the filtered"
-                        + " image.",required = True)
-    parser.add_argument("--minsize", "-ms",help="minimum size of a label",
-                        type = int, required = True)
-    parser.add_argument("--tilesizex", "-tx",help="Size of tiles along the "+
-                        "X-axis (default value is 256)", type = int, default =
-                        256)
-    parser.add_argument("--tilesizey", "-ty",help="Size of tiles along the "+
-                        "Y-axis (default value is 256)", type = int, default =
-                        256)
-    parser.add_argument("-out", "--out_file", help ="Name of the output file",
-                        required = True, type = str)
-    parser.add_argument("-d","--dir", default = "", help = "Path of the " +
-                        "folder where the output will be written.")   
-    args = parser.parse_args()
-    print args
-    
-    #set of the instances and the output name
-    seg_img = Raster(args.seg_file)
-    smooth_img = Raster(args.filtered_file)
-    output_merged = os.path.join(args.dir, args.out_file)
-    
-    #Execution of the method
-    merged_img = seg_img.lsms_merging(smooth_img, output_merged, 
-                                          args.minsize, tilesizex = \
-                                          args.tilesizex,tilesizey = \
-                                          args.tilesizey)
-    print "Merge has been realized succesfully"
-    
+    main()
