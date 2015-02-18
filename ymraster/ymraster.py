@@ -328,14 +328,13 @@ class Raster(Sized):
     useful information about the raster (number and size of bands, projection,
     etc.) and provide useful methods for comparing rasters, computing some
     indices, etc.
-
     """
 
     def __init__(self, filename):
         """Create a new raster object read from a file
 
-        :param filename: path to the file to read
-        :type filename: str
+        Args:
+            filename (str) path to the file to read
         """
         self._filename = filename
         self.refresh()
@@ -454,7 +453,7 @@ class Raster(Sized):
         self.refresh()
 
     def refresh(self):
-        """Refresh instance properties with metadata read from the file."""
+        """Reread the raster's properties from file."""
         ds = gdal.Open(self._filename, gdal.GA_ReadOnly)
         self._driver = ds.GetDriver()                   # gdal.Driver object
         self._width = ds.RasterXSize                    # int
@@ -494,7 +493,12 @@ class Raster(Sized):
 
     def has_same_extent(self, raster, prec=0.01):
         """Returns True if the raster and the other one has same extent, that is
-        the boundaries lives within the same precision.
+        the boundaries are equal.
+
+        Args:
+            raster (``Raster``): raster to compare extent with.
+            prec (float, optional): difference threshold under which coordinates
+                are said to be equal.
         """
         extents_almost_equals = tuple(
             map(lambda t1, t2: (abs(t1[0] - t2[0]) <= prec,
@@ -504,15 +508,17 @@ class Raster(Sized):
                                          (True, True), (True, True))
 
     def block_windows(self, block_size=None):
-        """Returns an iterator that yields successive block windows of the given
-        size for the raster.
+        """Get coordinates of all blocks in the raster that have the given size.
 
-        It takes care of adjusting the size at right and bottom of the raster.
+        It takes care of adjusting the size at right and bottom edges.
 
-        :param block_size: wanted size for the blocks (defaults to the "natural"
-                           block size of the raster
-        :type block_size: tuple (xsize, ysize)
-        :rtype: list of tuples in the form (i, j, xsize, ysize)
+        Args:
+            block_size (tuple (xsize, ysize), optional): wanted size for each
+                block (defaults to the "natural" block size of the raster)
+
+        Yields:
+            tuple (i, j, xsize, ysize): coordinates of the next block of given
+            size in the raster
         """
         # Default size for blocks
         xsize, ysize = block_size if block_size else self.block_size
@@ -532,19 +538,24 @@ class Raster(Sized):
 
     def array_from_bands(self, *idxs, **kw):
         """Returns the NumPy array extracted from the raster according to the
-        given parameters
+        given parameters.
 
-        If the band_idx parameter is given, then it's the 2-dimensional array
-        corresponding to the band in the raster at specified index.
+        If band indices are given, then only values from these bands are
+        returned.
 
-        If the block_win parameter is given, then it's the array corresponding
-        to the block in the raster at the specified window.
+        If the ``block_win`` parameter is given, then only values inside the
+        specified coordinates are returned.
 
-        :param idxs: indices of some band in the raster to get array from
-        :type idxs: int
-        :param block_win: block window in the raster (x, y, hsize, vsize)
-        :type block_win: 4-tuple of int
-        :rtype: numpy.ndarray
+        These parameters can be combined to get, for example, a block only from
+        one band.
+
+        Args:
+            idxs (int, optional): indices of bands to get array from
+            block_win (tuple (x, y, xsize, ysize), optional): block window to
+                get array from
+
+        Returns:
+            numpy.ndarray: array extracted from the raster
         """
         # Get size of output array and initialize an empty array (if multi-band)
         (hsize, vsize) = (kw['block_win'][2], kw['block_win'][3]) \
