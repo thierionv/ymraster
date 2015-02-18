@@ -4,17 +4,13 @@ Created on Tue Feb 17 15:14:42 2015
 
 @author: sig
 """
+import argparse
+import os
+from ymraster import classification as cla
+from ymraster import Raster
+from sklearn.cross_validation import train_test_split
 
-
-if __name__ == "__main__":
-    """
-    """
-    import argparse
-    import os
-    from ymraster import classification as cla
-    from ymraster import Raster
-    from sklearn.cross_validation import train_test_split
-    
+def command_line_arguments():
     #Set of the parse arguments
     desc = "From a roi(ground truth), a labeled and a satistic raster, "+\
             "perform a decision tree classification, supply the main "+\
@@ -44,10 +40,9 @@ if __name__ == "__main__":
                         required = True, type = str)
     parser.add_argument("-d","--dir", default = "", help = "Path of the " +
                         "folder where the output will be written.")
-    args = parser.parse_args()    
-    print "\n"
-    print args
-    print "\n"
+    return parser.parse_args() 
+
+def stat_to_classification(args):
     
     #Get the sample-feature matrix from the roi 
     X, Y = cla.get_samples_from_roi(args.label_file,args.roi_file,
@@ -57,7 +52,7 @@ if __name__ == "__main__":
     X_label, reverse = cla.get_samples_from_label_img(args.label_file,
                                                       args.stat_file )
     
-    #Split into two dataset the roi
+    #Split the roi into two dataset 
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y,train_size =\
                                                         args.train_size)
     #set some parameters
@@ -65,7 +60,6 @@ if __name__ == "__main__":
     out_filename = os.path.join(args.dir,args.out_file)
     
     #Initialize the classifier, train it and perform it
-    clf = cla.tree.DecisionTreeClassifier()
     Y_predict = cla.decision_tree(X_train, Y_train, X_test, X_label, reverse, 
                                   stat,out_filename, ext = args.format)
     
@@ -78,3 +72,12 @@ if __name__ == "__main__":
     print "confusion matrix\n", cm
     print report
     print "OA :", accuracy
+
+def main():
+    args = command_line_arguments()
+    stat_to_classification(args)
+    
+if __name__ == "__main__":
+    main()
+   
+    
