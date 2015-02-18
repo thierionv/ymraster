@@ -1,23 +1,26 @@
+#!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
 
-import argparse
 from ymraster import Raster
+
+import argparse
 
 
 def command_line_arguments():
-    parser = argparse.ArgumentParser(description="Compute per object/label "
-                                     "statistics on a raster given a label "
-                                     "file")
-    parser.add_argument("raster", help="Path to the raster to compute "
-                        "statistics from")
+    parser = argparse.ArgumentParser(
+        description="Compute per object/label statistics on a raster, given a "
+        "label file")
+    parser.add_argument("raster",
+                        help="Path to the raster to compute statistics from")
     parser.add_argument("-s", "--stats", nargs='+',
                         default=["min", "max", "mean", "std", "per:20",
                                  "per:40", "median", "per:60", "per:80"],
-                        help="List of statistics to compute")
-    parser.add_argument("-l", "--label_file", required=True, help="Path to the "
-                        "label image")
-    parser.add_argument("-out", "--out_file", help="Name of the output file. "
-                        "If omitted, a default name is chosen")
+                        help="Space separated fist of statistics to compute")
+    parser.add_argument("-l", "--label_file", required=True,
+                        help="Path to the label image")
+    parser.add_argument("-o", "--out_file",
+                        help="Path to the output file. "
+                        "A default name is chosen if omitted")
     return parser.parse_args()
 
 

@@ -1,3 +1,4 @@
+#!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
 
 from ymraster import Raster
@@ -6,22 +7,23 @@ import argparse
 
 
 def command_line_arguments():
-    parser = argparse.ArgumentParser(description="Apply a mask to a raster "
-                                     "that is set a common value to all pixels "
-                                     "that are under a given mask.")
-    parser.add_argument("raster",  help="Path to the raster on which to apply "
+    parser = argparse.ArgumentParser(
+        description="Apply a mask to each given raster, that is set a common "
+        "value to all pixels that are under a given mask.")
+    parser.add_argument("raster", nargs="+",
+                        help="Space separated list of raster on which to apply "
                         "the mask")
-    parser.add_argument("-m", "--mask",  required=True, help="Path to the mask")
+    parser.add_argument("-m", "--mask",  required=True,
+                        help="Path to the mask to use")
     parser.add_argument("-v", "--mask-value", type=int, default=1,
-                        help='"Masked" value in the mask raster')
-    parser.add_argument("-s", "--set_value",  type=int, help='Value to set '
-                        'to the "masked" pixels in the output file. Default is '
-                        "the max of the data type")
-    parser.add_argument("-o", "--out_file", required=True, help="Path to the "
-                        "output file. By default it is the max of the data "
-                        "type")
-    args = parser.parse_args()
-    return args
+                        help='"Masked" value in the mask raster (default: 1)')
+    parser.add_argument("-s", "--set_value",  type=int,
+                        help='Value to set to the "masked" pixels in the '
+                        "output file. Default is the max of the data type")
+    parser.add_argument("-o", "--out_file",
+                        help="Path to the output file. The original raster "
+                        "file is overwritten if omitted")
+    return parser.parse_args()
 
 
 def apply_mask(args):

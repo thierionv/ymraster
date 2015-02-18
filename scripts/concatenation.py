@@ -1,3 +1,4 @@
+#!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
 
 from ymraster import Raster, concatenate_rasters
@@ -6,14 +7,14 @@ import argparse
 
 
 def command_line_arguments():
-    parser = argparse.ArgumentParser(description="Write an image which is "
-                                     "the concatenation of the given rasters "
-                                     "in order. All input rasters must have "
-                                     "same size.")
-    parser.add_argument("raster", nargs='+',  help="Space separated list of "
-                        "images to concatenate")
-    parser.add_argument("-o", "--out_file", help="Path to the output file."
-                        "By default, the first image is overwritten")
+    parser = argparse.ArgumentParser(
+        description="Write an image which is the concatenation of the given "
+        "rasters in order.")
+    parser.add_argument("raster", nargs='+',
+                        help="Space separated list of rasters to concatenate")
+    parser.add_argument("-o", "--out_file",
+                        help="Path to the output file. The first image is "
+                        "overwritten if omitted")
     return parser.parse_args()
 
 

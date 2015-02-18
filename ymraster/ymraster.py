@@ -1058,14 +1058,14 @@ class Raster(Sized):
                       **kw):
         """Third (optional) step in a LSMS segmentation:  merge objects in the
         raster whose size in pixels is lower than a given threshold into the
-        bigger enough adjacent object with closest radiometry (radiometry is
-        given by the original image from which the labeled raster was computed).
+        bigger enough adjacent object with closest radiometry.
 
         This assumes that the ``Raster`` object is a segmented and labeled
         image, for example as returned by the ``lsms_segmentation`` method.
 
-        To consume less memory resources, the method tiles the raster and
-        performs the segmentation on each tile.
+        The closest bigger object into which the small one is merged is
+        determined by using the smoothed image which was produced by the first
+        step of smoothing.
 
         This is an adapted version of the Orfeo Toolbox
         ``LSMSSmallRegionsMerging`` application. See
@@ -1254,8 +1254,6 @@ class Raster(Sized):
                 object_minsize=object_minsize,
                 smoothed_raster=smoothed_raster,
                 out_filename=out_filename)
-        else:
-            pass
 
         # Optional fourth step: convert into vector
         if out_vector_filename:
