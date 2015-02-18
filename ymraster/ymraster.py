@@ -1303,7 +1303,7 @@ class Raster(Sized):
         :param ext: Format in wich the output image is written. Any formats
                     supported by GDAL
         """
-        # Initialize an empty file with correct size and dtype of float64
+        # Create an empty file with correct size and dtype float64
         out_filename = kw['out_filename'] \
             if kw.get('out_filename') \
             else '{:b}_label_stats.tif'.format(self)
@@ -1312,20 +1312,21 @@ class Raster(Sized):
         meta['dtype'] = rdtype.RasterDataType(gdal_dtype=gdal.GDT_Float64)
         write_file(out_filename, overwrite=True, **meta)
 
-        # Get array of labels from label file and vector of unique labels
+        # Get array of labels from label file
         label_raster = kw['label_raster'] \
             if kw.get('label_raster') \
             else None
         label_array = label_raster.array_from_bands()
+        # Get array of unique labels
         unique_labels_array = np.unique(label_array)
 
-        # TODO : créer une liste unique de type de stat
-        # Compute the object image
+        # Compute label stats
         i = 1
-        for band_array, _ in self.band_arrays():           # For each band
-            for statname in stats:                      # For each stat
+        # For each band
+        for band_array, _ in self.band_arrays(mask_nodata=True):
+            for statname in stats:                              # For each stat
                 astat = array_stat.ArrayStat(statname)
-                for label in unique_labels_array:       # For each label
+                for label in unique_labels_array:               # For each label
                     # Compute stat for label
                     label_indices = np.where(label_array == label)
                     band_array[label_indices] = astat.compute(
