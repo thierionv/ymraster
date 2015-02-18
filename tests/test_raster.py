@@ -6,7 +6,7 @@ import tempfile
 
 from ymraster import write_file, concatenate_rasters, Raster
 from ymraster.dtype import RasterDataType
-from osgeo import ogr, osr
+from osgeo import ogr, osr, gdal
 import numpy as np
 
 import re
@@ -26,7 +26,8 @@ def write_file_unique_value(filename,
                     dtype=dtype.numpy_dtype) * value \
         if number_bands > 1 \
         else np.ones((height, width), dtype=dtype.numpy_dtype) * value
-    write_file(filename, drivername='GTiff', dtype=dtype, array=array)
+    write_file(filename, driver=gdal.GetDriverByName('GTiff'), dtype=dtype,
+               array=array)
 
 
 def _check_image(tester,
@@ -150,7 +151,8 @@ class TestArrayToRaster(unittest.TestCase):
                     dtype=dtype.numpy_dtype) * value
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
         self.assertRaises(ValueError, write_file, out_file.name,
-                          drivername='GTiff', dtype=dtype, array=a)
+                          driver=gdal.GetDriverByName('GTiff'), dtype=dtype,
+                          array=a)
 
     def testwrite_file_should_raise_not_implemented_if_four_dimensional(self):
         width = 3
@@ -162,7 +164,8 @@ class TestArrayToRaster(unittest.TestCase):
                     dtype=dtype.numpy_dtype) * value
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
         self.assertRaises(ValueError, write_file, out_file.name,
-                          drivername='GTiff', dtype=dtype, array=a)
+                          driver=gdal.GetDriverByName('GTiff'), dtype=dtype,
+                          array=a)
 
     def tearDown(self):
         tmpdir = tempfile.gettempdir()

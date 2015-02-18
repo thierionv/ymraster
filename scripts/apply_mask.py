@@ -27,12 +27,13 @@ def command_line_arguments():
 
 
 def apply_mask(args):
-    raster = Raster(args.raster)
     mask_raster = Raster(args.mask)
-    raster.apply_mask(mask_raster=mask_raster,
-                      mask_value=args.mask_value,
-                      set_value=args.set_value,
-                      out_filename=args.out_file)
+    for filename in args.raster:
+        raster = Raster(filename)
+        raster.apply_mask(mask_raster=mask_raster,
+                          mask_value=args.mask_value,
+                          set_value=args.set_value,
+                          out_filename=args.out_file)
 
 
 def main():
