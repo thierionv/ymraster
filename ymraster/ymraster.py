@@ -1281,7 +1281,9 @@ class Raster(Sized):
             shutil.copy(out_label_filename, out_filename)
 
         # Optional fourth step: convert into vector
-        if kw.get('out_vector_filename'):
+        if kw.get('out_vector_filename') \
+                or (not kw.get('out_vector_filename')
+                    and not kw.get('out_filename')):
             out_raster = Raster(out_filename)
             out_raster._lsms_vectorization(
                 orig_raster=self,
