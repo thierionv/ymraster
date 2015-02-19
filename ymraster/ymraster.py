@@ -1277,9 +1277,11 @@ class Raster(Sized):
                 smoothed_raster=smoothed_raster,
                 block_size=block_size,
                 out_filename=out_filename)
+        else:
+            shutil.copy(out_label_filename, out_filename)
 
         # Optional fourth step: convert into vector
-        if out_vector_filename:
+        if kw.get('out_vector_filename'):
             out_raster = Raster(out_filename)
             out_raster._lsms_vectorization(
                 orig_raster=self,
@@ -1291,7 +1293,10 @@ class Raster(Sized):
                          out_label_filename):
             os.remove(filename)
 
-        return Raster(out_filename)
+        if kw.get('out_filename'):
+            return Raster(out_filename)
+        else:
+            os.remove(out_filename)
 
     def label_stats(self,
                     stats=['mean', 'std', 'min', 'max', "per:20",
