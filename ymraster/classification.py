@@ -7,7 +7,7 @@ Created on Wed Feb  4 14:54:42 2015
 import numpy as np
 from osgeo import gdal
 from ymraster import Raster, write_file
-from ymraster.dtype import RasterDataType
+from raster_dtype import RasterDataType
 from sklearn import tree
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, classification_report,\
@@ -32,17 +32,10 @@ def get_samples_from_roi(in_rst_label,in_rst_roi,in_rst_stat ):
             X: the sample matrix. A nXd matrix, where n is the number of
             referenced samples and d is the number of features. Each line of
             the matrix is sample.
-<<<<<<< HEAD:ymraster/classification.py
             
             Y: the classes of the samples in a vertical n matrix. 
     ''' 
     
-=======
-
-            Y: the classe of the samples in a vertical n matrix.
-    '''
-
->>>>>>> origin/master:ymraster/stat_into_roi.py
     ## Open data
     stat = gdal.Open(in_rst_stat,gdal.GA_ReadOnly)
     if stat is None:
@@ -129,15 +122,9 @@ def get_samples_from_label_img(in_rst_label, in_rst_stat):
             X: the sample matrix. A nXd matrix, where n is the number of
             label and d is the number of features. Each line of
             the matrix is label.
-<<<<<<< HEAD:ymraster/classification.py
-            
-            reverse: reverse matrix that can permit to rebuild an image from the 
-            result of an object classification. 
-=======
 
             reverse: everse matrix that can permit to rebuild an image from the
             result of an object classification.
->>>>>>> origin/master:ymraster/stat_into_roi.py
     """
     ## Open data
     stat = gdal.Open(in_rst_stat,gdal.GA_ReadOnly)
@@ -194,7 +181,6 @@ def get_samples_from_label_img(in_rst_label, in_rst_stat):
 
     return X, reverse
 
-<<<<<<< HEAD:ymraster/classification.py
 def decision_tree(X_train, Y_train, X_test, X_img, reverse_array, raster, 
                   out_filename, ext = 'Gtiff' ):
     """
@@ -227,9 +213,7 @@ def decision_tree(X_train, Y_train, X_test, X_img, reverse_array, raster,
     """
     #Get some parameters    
     rows = raster.meta['height']
-    col = raster.meta['width']
-    proj = raster.meta['srs']
-    geotransform = raster.meta['transform']    
+    col = raster.meta['width']   
     
     #Set the DecisionTreeClassifier
     clf = tree.DecisionTreeClassifier()
@@ -248,9 +232,11 @@ def decision_tree(X_train, Y_train, X_test, X_img, reverse_array, raster,
     classif = classif.reshape(rows,col)
     
     #write the file
-    write_file(out_filename, overwrite=True, drivername= ext, 
-               dtype= RasterDataType(numpy_dtype = sp.uint32), array=classif,
-                 srs= proj, transform=geotransform)
+    meta = raster.meta
+    meta['driver'] = gdal.GetDriverByName(ext)
+    meta['dtype'] = RasterDataType(numpy_dtype = np.uint32)
+    meta['count'] = None
+    write_file(out_filename, overwrite=True, array=classif, **meta)
                  
     return y_predict
 
@@ -273,6 +259,12 @@ def pred_error_metrics(Y_predict, Y_test, target_names = None):
                         classified samples (float), else it returns the number
                         of correctly classified samples (int).
     """
+    
+    
+    #Compute the main classification metrics 
+    report = classification_report(Y_test, Y_predict, target_names = target_names)
+    accuracy = accuracy_score(Y_test, Y_predict)
+    
     #Compute the confusion matrix
     cm = confusion_matrix(Y_test, Y_predict)
         
@@ -284,10 +276,5 @@ def pred_error_metrics(Y_predict, Y_test, target_names = None):
     plt.xlabel('Predicted label')
     plt.show()
     
-    #Compute the main classification metrics 
-    report = classification_report(Y_test, Y_predict, target_names = target_names)
-    accuracy = accuracy_score(Y_test, Y_predict)
-    
     return cm, report, accuracy
-=======
->>>>>>> origin/master:ymraster/stat_into_roi.py
+
