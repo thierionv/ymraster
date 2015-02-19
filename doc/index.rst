@@ -16,7 +16,7 @@
 The ``Raster`` class
 ====================
 
-.. automodule:: ymraster.raster
+.. automodule:: ymraster.ymraster
    :members:
 
 

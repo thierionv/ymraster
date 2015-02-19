@@ -30,6 +30,12 @@ def command_line_arguments():
     parser.add_argument("-vf", "--vector_file",
                         help="Path to the vector file."
                         "No vector file is produced if omitted")
+    parser.add_argument("-bw", "--block_width", type=int,
+                        help="Block width "
+                        '(default: image "natural" block width)')
+    parser.add_argument("-bh", "--block_height", type=int,
+                        help="Block height "
+                        '(default: image "natural" block height)')
     parser.add_argument("-o", "--out_file",
                         help="Path to the output file. "
                         "A default file name is chosen if omitted")
@@ -38,9 +44,13 @@ def command_line_arguments():
 
 def lsms_segmentation(args):
     raster = Raster(args.raster)
+    block_size = (args.block_width, args.block_height) \
+        if args.block_width and args.block_height \
+        else None
     raster.lsms_segmentation(args.spatialr, args.spectralr, args.thres,
                              args.rangeramp, args.maxiter,
                              object_minsize=args.minsize,
+                             block_size=block_size,
                              out_vector_filename=args.vector_file,
                              out_filename=args.out_file)
 

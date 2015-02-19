@@ -131,14 +131,16 @@ def write_file(out_filename, array=None, overwrite=False,
     """
     # Size & data type of output image
     xsize, ysize = (kw['width'], kw['height']) \
-        if 'width' in kw and 'height' in kw \
+        if kw.get('width') and kw.get('height') \
         else (array.shape[1], array.shape[0])
     try:
-        number_bands = kw['depth'] if 'depth' in kw else array.shape[2]
+        number_bands = kw['count'] \
+            if kw.get('count') \
+            else array.shape[2]
     except IndexError:
         number_bands = 1
     dtype = kw['dtype'] \
-        if 'dtype' in kw \
+        if kw.get('dtype') \
         else rdtype.RasterDataType(numpy_dtype=array.dtype)
 
     # Create an empty raster file if it does not exists or if overwrite is True
@@ -146,20 +148,19 @@ def write_file(out_filename, array=None, overwrite=False,
         assert not overwrite
         out_ds = gdal.Open(out_filename, gdal.GA_Update)
     except (AssertionError, RuntimeError):
-        driver = gdal.GetDriverByName(kw['drivername'])
-        out_ds = driver.Create(out_filename,
-                               xsize,
-                               ysize,
-                               number_bands,
-                               dtype.gdal_dtype)
+        out_ds = kw['driver'].Create(out_filename,
+                                     xsize,
+                                     ysize,
+                                     number_bands,
+                                     dtype.gdal_dtype)
 
     # Set metadata
-    if 'date_time' in kw:
+    if kw.get('date_time'):
         out_ds.SetMetadata(
             {'TIFFTAG_DATETIME': kw['date_time'].strftime('%Y:%m:%d %H:%M:%S')})
-    if 'srs' in kw:
+    if kw.get('srs'):
         out_ds.SetProjection(kw['srs'].ExportToWkt())
-    if 'transform' in kw:
+    if kw.get('transform'):
         out_ds.SetGeoTransform(kw['transform'])
 
     # If no array, nothing else to do
@@ -219,7 +220,7 @@ def concatenate_rasters(*rasters, **kw):
 
     # Out file
     out_filename = kw['out_filename'] \
-        if 'out_filename' in kw and kw['out_filename'] \
+        if kw.get('out_filename') \
         else os.path.join(gettempdir(), 'concat.tif')
 
     # Perform the concatenation
@@ -232,7 +233,7 @@ def concatenate_rasters(*rasters, **kw):
     ConcatenateImages.ExecuteAndWriteOutput()
 
     # Overwrite if needed
-    if 'out_filename' not in kw:
+    if not kw.get('out_filename'):
         shutil.copy(out_filename, raster0.filename)
         os.remove(out_filename)
 
@@ -272,7 +273,7 @@ def temporal_stats(rasters,
     """
     # Out filename
     out_filename = kw['out_filename'] \
-        if 'out_filename' in kw and kw['out_filename'] \
+        if kw.get('out_filename') \
         else '{}.tif'.format('_'.join(stats))
 
     # Number of bands in output file (1 for each stat +1 for each summary stat)
@@ -327,14 +328,13 @@ class Raster(Sized):
     useful information about the raster (number and size of bands, projection,
     etc.) and provide useful methods for comparing rasters, computing some
     indices, etc.
-
     """
 
     def __init__(self, filename):
         """Create a new raster object read from a file
 
-        :param filename: path to the file to read
-        :type filename: str
+        Args:
+            filename (str) path to the file to read
         """
         self._filename = filename
         self.refresh()
@@ -453,7 +453,7 @@ class Raster(Sized):
         self.refresh()
 
     def refresh(self):
-        """Refresh instance properties with metadata read from the file."""
+        """Reread the raster's properties from file."""
         ds = gdal.Open(self._filename, gdal.GA_ReadOnly)
         self._driver = ds.GetDriver()                   # gdal.Driver object
         self._width = ds.RasterXSize                    # int
@@ -493,7 +493,12 @@ class Raster(Sized):
 
     def has_same_extent(self, raster, prec=0.01):
         """Returns True if the raster and the other one has same extent, that is
-        the boundaries lives within the same precision.
+        the boundaries are equal.
+
+        Args:
+            raster (``Raster``): raster to compare extent with.
+            prec (float, optional): difference threshold under which coordinates
+                are said to be equal.
         """
         extents_almost_equals = tuple(
             map(lambda t1, t2: (abs(t1[0] - t2[0]) <= prec,
@@ -503,15 +508,17 @@ class Raster(Sized):
                                          (True, True), (True, True))
 
     def block_windows(self, block_size=None):
-        """Returns an iterator that yields successive block windows of the given
-        size for the raster.
+        """Get coordinates of all blocks in the raster that have the given size.
 
-        It takes care of adjusting the size at right and bottom of the raster.
+        It takes care of adjusting the size at right and bottom edges.
 
-        :param block_size: wanted size for the blocks (defaults to the "natural"
-                           block size of the raster
-        :type block_size: tuple (xsize, ysize)
-        :rtype: list of tuples in the form (i, j, xsize, ysize)
+        Args:
+            block_size (tuple (xsize, ysize), optional): wanted size for each
+                block (defaults to the "natural" block size of the raster)
+
+        Yields:
+            tuple (i, j, xsize, ysize): coordinates of the next block of given
+            size in the raster
         """
         # Default size for blocks
         xsize, ysize = block_size if block_size else self.block_size
@@ -531,23 +538,28 @@ class Raster(Sized):
 
     def array_from_bands(self, *idxs, **kw):
         """Returns the NumPy array extracted from the raster according to the
-        given parameters
+        given parameters.
 
-        If the band_idx parameter is given, then it's the 2-dimensional array
-        corresponding to the band in the raster at specified index.
+        If band indices are given, then only values from these bands are
+        returned.
 
-        If the block_win parameter is given, then it's the array corresponding
-        to the block in the raster at the specified window.
+        If the ``block_win`` parameter is given, then only values inside the
+        specified coordinates are returned.
 
-        :param idxs: indices of some band in the raster to get array from
-        :type idxs: int
-        :param block_win: block window in the raster (x, y, hsize, vsize)
-        :type block_win: 4-tuple of int
-        :rtype: numpy.ndarray
+        These parameters can be combined to get, for example, a block only from
+        one band.
+
+        Args:
+            idxs (int, optional): indices of bands to get array from
+            block_win (tuple (x, y, xsize, ysize), optional): block window to
+                get array from
+
+        Returns:
+            numpy.ndarray: array extracted from the raster
         """
         # Get size of output array and initialize an empty array (if multi-band)
         (hsize, vsize) = (kw['block_win'][2], kw['block_win'][3]) \
-            if 'block_win' in kw \
+            if kw.get('block_win') \
             else (self._width, self._height)
         depth = len(idxs) if idxs else self._count
         if depth > 1:
@@ -558,11 +570,11 @@ class Raster(Sized):
         ds = gdal.Open(self._filename, gdal.GA_ReadOnly)
         for array_i in range(depth):
             ds_i = idxs[array_i] if idxs else array_i + 1
-            if depth == 1 and 'block_win' in kw:
+            if depth == 1 and kw.get('block_win'):
                 array = ds.GetRasterBand(ds_i).ReadAsArray(*kw['block_win'])
-            elif depth == 1 and 'block_win' not in kw:
+            elif depth == 1 and not kw.get('block_win'):
                 array = ds.GetRasterBand(ds_i).ReadAsArray()
-            elif depth > 1 and 'block_win' in kw:
+            elif depth > 1 and kw.get('block_win'):
                 array[:, :, array_i] = ds.GetRasterBand(ds_i).ReadAsArray(
                     *kw['block_win'])
             else:
@@ -570,7 +582,7 @@ class Raster(Sized):
         ds = None
 
         # Create the masked array if wanted
-        if 'mask_nodata' in kw and kw['mask_nodata']:
+        if kw.get('mask_nodata'):
             return ma.masked_where(array == self._nodata_value, array)
         else:
             return array
@@ -617,7 +629,7 @@ class Raster(Sized):
 
         # Out file
         out_filename = kw['out_filename'] \
-            if 'out_filename' in kw and kw['out_filename'] \
+            if kw.get('out_filename') \
             else os.path.join(gettempdir(), 'bands_removed.tif')
 
         # Concatenate the mono-band images without the unwanted band
@@ -637,7 +649,7 @@ class Raster(Sized):
             os.remove(os.path.join(gettempdir(), 'splitted_{}.tif'.format(i)))
 
         # Overwrite if wanted else return the new Raster
-        if 'out_filename' not in kw:
+        if not kw.get('out_filename'):
             shutil.copy(out_filename, self._filename)
             os.remove(out_filename)
         else:
@@ -662,11 +674,11 @@ class Raster(Sized):
         """
         # Create an empty file with same size and dtype of float64
         out_filename = kw['out_filename'] \
-            if 'out_filename' in kw and kw['out_filename'] \
+            if kw.get('out_filename') \
             else os.path.join(gettempdir(), 'bands_rescaled.tif')
         meta = self.meta
         meta['dtype'] = rdtype.RasterDataType(gdal_dtype=gdal.GDT_Float64)
-        write_file(out_filename, overwrite=True, **self.meta)
+        write_file(out_filename, overwrite=True, **meta)
 
         # For each band, compute rescale if asked, then save band in empty file
         #        for i in range(1, self._count+1):
@@ -688,7 +700,7 @@ class Raster(Sized):
             write_file(out_filename, array, xoffset=xoffset, yoffset=yoffset)
 
         # Overwrite if wanted else return the new Raster
-        if 'out_filename' not in kw:
+        if not kw.get('out_filename'):
             shutil.copy(out_filename, self._filename)
             os.remove(out_filename)
         else:
@@ -723,7 +735,7 @@ class Raster(Sized):
 
         # Out file
         out_filename = kw['out_filename'] \
-            if 'out_filename' in kw and kw['out_filename'] \
+            if kw.get('out_filename') \
             else os.path.join(gettempdir(), 'pan_sharpened.tif')
 
         # Actual sharpening
@@ -734,7 +746,7 @@ class Raster(Sized):
         Pansharpening.ExecuteAndWriteOutput()
 
         # Overwrite if wanted else return the new Raster
-        if 'out_filename' not in kw:
+        if not kw.get('out_filename'):
             shutil.copy(out_filename, self._filename)
             os.remove(out_filename)
         else:
@@ -755,7 +767,7 @@ class Raster(Sized):
         """
         # Out file
         out_filename = None
-        if 'out_filename' in kw and kw['out_filename']:
+        if kw.get('out_filename'):
             out_filename = kw['out_filename']
         else:
             inames = [rindex.split(':') for rindex in indices]
@@ -815,7 +827,7 @@ class Raster(Sized):
         :type out_filename: str
         """
         out_filename = kw['out_filename'] \
-            if 'out_filename' in kw and kw['out_filename'] \
+            if kw.get('out_filename') \
             else '{:b}_ndvi.tif'.format(self)
         return self.radiometric_indices("Vegetation:NDVI",
                                         red_idx=red_idx,
@@ -836,7 +848,7 @@ class Raster(Sized):
         :type out_filename: str
         """
         out_filename = kw['out_filename'] \
-            if 'out_filename' in kw and kw['out_filename'] \
+            if kw.get('out_filename') \
             else '{:b}_ndwi.tif'.format(self)
         return self.radiometric_indices("Water:NDWI",
                                         nir_idx=nir_idx,
@@ -857,7 +869,7 @@ class Raster(Sized):
         :type out_filename: str
         """
         out_filename = kw['out_filename'] \
-            if 'out_filename' in kw and kw['out_filename'] \
+            if kw.get('out_filename') \
             else '{:b}_mndwi.tif'.format(self)
         return self.radiometric_indices("Water:MNDWI",
                                         green_idx=green_idx,
@@ -902,7 +914,7 @@ class Raster(Sized):
 
         # Out file
         out_filename = kw['out_filename'] \
-            if 'out_filename' in kw and kw['out_filename'] \
+            if kw.get('out_filename') \
             else os.path.join(gettempdir(), 'masked.tif')
 
         # Actual mask application
@@ -971,10 +983,10 @@ class Raster(Sized):
         """
         # Out files
         out_filename = kw['out_filename'] \
-            if 'out_filename' in kw and kw['out_filename'] \
+            if kw.get('out_filename') \
             else '{:b}_smooth.tif'.format(self)
         out_spatial_filename = kw['out_spatial_filename'] \
-            if 'out_spatial_filename' in kw and kw['out_spatial_filename'] \
+            if kw.get('out_spatial_filename') \
             else '{:b}_spatial.tif'.format(self)
 
         # Actual smoothing
@@ -1035,11 +1047,12 @@ class Raster(Sized):
 
         # Out file
         out_filename = kw['out_filename'] \
-            if 'out_filename' in kw and kw['out_filename'] \
+            if kw.get('out_filename') \
             else '{:b}_label.tif'.format(self)
 
         # Actual segmentation
         LSMSSegmentation = otb.Registry.CreateApplication("LSMSSegmentation")
+        LSMSSegmentation.SetParameterString("tmpdir", gettempdir())
         LSMSSegmentation.SetParameterString("in", self._filename)
         LSMSSegmentation.SetParameterString("inpos",
                                             spatial_raster.filename)
@@ -1097,7 +1110,7 @@ class Raster(Sized):
 
         # Out file
         out_filename = kw['out_filename'] \
-            if 'out_filename' in kw and kw['out_filename'] \
+            if kw.get('out_filename') \
             else os.path.join(gettempdir(), 'labels.tif')
 
         # Actual merging
@@ -1113,7 +1126,7 @@ class Raster(Sized):
         LSMSSmallRegionsMerging.ExecuteAndWriteOutput()
 
         # Overwrite if wanted else return the new Raster
-        if 'out_filename' not in kw:
+        if not kw.get('out_filename'):
             shutil.copy(out_filename, self._filename)
             os.remove(out_filename)
         else:
@@ -1157,7 +1170,7 @@ class Raster(Sized):
 
         # Out file
         out_filename = kw['out_filename'] \
-            if 'out_filename' in kw and kw['out_filename'] \
+            if kw.get('out_filename') \
             else '{:b}_label.shp'.format(self)
 
         # Actual vectorization
@@ -1177,8 +1190,8 @@ class Raster(Sized):
                           rangeramp=0,
                           maxiter=10,
                           object_minsize=None,
-                          out_vector_filename=None,
-                          out_filename='labels.tif'):
+                          block_size=None,
+                          **kw):
         """Performs a Large-Scale-Mean-Shift (LSMS) object segmentation on the
         raster.
 
@@ -1229,7 +1242,15 @@ class Raster(Sized):
         out_spatial_filename = os.path.join(
             tmpdir, '{:b}_spatial.tif'.format(self))
         out_label_filename = os.path.join(
-            tmpdir, '{:b}_labels.tif'.format(self))
+            tmpdir, '{:b}_label.tif'.format(self))
+
+        # Out files
+        out_filename = kw['out_filename'] \
+            if kw.get('out_filename') \
+            else '{:b}_label.tif'.format(self)
+        out_vector_filename = kw['out_vector_filename'] \
+            if kw.get('out_vector_filename') \
+            else '{:b}_label.shp'.format(self)
 
         # First step: smoothing
         smoothed_raster, spatial_raster = self._lsms_smoothing(
@@ -1246,6 +1267,7 @@ class Raster(Sized):
             spatialr=spatialr,
             ranger=ranger,
             spatial_raster=spatial_raster,
+            block_size=block_size,
             out_filename=out_label_filename)
 
         # Optional third step: merge small objects (< minsize) into bigger ones
@@ -1253,13 +1275,19 @@ class Raster(Sized):
             label_raster._lsms_merging(
                 object_minsize=object_minsize,
                 smoothed_raster=smoothed_raster,
+                block_size=block_size,
                 out_filename=out_filename)
+        else:
+            shutil.copy(out_label_filename, out_filename)
 
         # Optional fourth step: convert into vector
-        if out_vector_filename:
+        if kw.get('out_vector_filename') \
+                or (not kw.get('out_vector_filename')
+                    and not kw.get('out_filename')):
             out_raster = Raster(out_filename)
             out_raster._lsms_vectorization(
                 orig_raster=self,
+                block_size=block_size,
                 out_filename=out_vector_filename)
 
         # Remove temp files
@@ -1267,7 +1295,10 @@ class Raster(Sized):
                          out_label_filename):
             os.remove(filename)
 
-        return Raster(out_filename)
+        if kw.get('out_filename'):
+            return Raster(out_filename)
+        else:
+            os.remove(out_filename)
 
     def label_stats(self,
                     stats=['mean', 'std', 'min', 'max', "per:20",
@@ -1290,31 +1321,34 @@ class Raster(Sized):
         :param ext: Format in wich the output image is written. Any formats
                     supported by GDAL
         """
-        # Initialize an empty file with correct size and dtype of float64
+        # Create an empty file with correct size and dtype float64
         out_filename = kw['out_filename'] \
-            if 'out_filename' in kw and kw['out_filename'] \
+            if kw.get('out_filename') \
             else '{:b}_label_stats.tif'.format(self)
         meta = self.meta
         meta['count'] = len(stats) * self._count
         meta['dtype'] = rdtype.RasterDataType(gdal_dtype=gdal.GDT_Float64)
-        write_file(out_filename, overwrite=True, **self.meta)
+        write_file(out_filename, overwrite=True, **meta)
 
-        # Get label array from label file and unique labels
+        # Get array of labels from label file
         label_raster = kw['label_raster'] \
-            if 'label_raster' in kw and kw['label_raster'] \
+            if kw.get('label_raster') \
             else None
         label_array = label_raster.array_from_bands()
+        # Get array of unique labels
         unique_labels_array = np.unique(label_array)
 
-        # TODO : créer une liste unique de type de stat
-        # Compute the object image
+        # Compute label stats
         i = 1
-        for band_array in self.band_arrays():  # for each band
-            for statname in stats:  # for each stat
+        # For each band
+        for band_array, _ in self.band_arrays(mask_nodata=True):
+            for statname in stats:                              # For each stat
                 astat = array_stat.ArrayStat(statname)
-                for label in unique_labels_array:  # for each label
-                    array = astat.compute(
-                        band_array[np.where((label_array == label))])
+                for label in unique_labels_array:               # For each label
+                    # Compute stat for label
+                    label_indices = np.where(label_array == label)
+                    band_array[label_indices] = astat.compute(
+                        band_array[label_indices])
                 # Write the new band
-                write_file(out_filename, array, band_idx=i)
+                write_file(out_filename, band_array, band_idx=i)
                 i += 1
