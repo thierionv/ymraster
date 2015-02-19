@@ -9,6 +9,7 @@ import os
 from ymraster import classification as cla
 from ymraster import Raster
 from sklearn.cross_validation import train_test_split
+import matplotlib.pyplot as plt
 
 def command_line_arguments():
     #Set of the parse arguments
@@ -72,6 +73,14 @@ def stat_to_classification(args):
     print "confusion matrix\n", cm
     print report
     print "OA :", accuracy
+    
+    # Show confusion matrix in a separate window
+    plt.matshow(cm)
+    plt.title('Confusion matrix')
+    plt.colorbar()
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
+    plt.show()
 
 def main():
     args = command_line_arguments()

@@ -9,7 +9,6 @@ from osgeo import gdal
 from ymraster import Raster, write_file
 from raster_dtype import RasterDataType
 from sklearn import tree
-import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, classification_report,\
                              accuracy_score
 
@@ -268,13 +267,6 @@ def pred_error_metrics(Y_predict, Y_test, target_names = None):
     #Compute the confusion matrix
     cm = confusion_matrix(Y_test, Y_predict)
         
-    # Show confusion matrix in a separate window
-    plt.matshow(cm)
-    plt.title('Confusion matrix')
-    plt.colorbar()
-    plt.ylabel('True label')
-    plt.xlabel('Predicted label')
-    plt.show()
     
     return cm, report, accuracy
 
