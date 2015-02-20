@@ -49,7 +49,8 @@ except ImportError as e:
     raise ImportError(
         str(e) + "\n\nPlease install NumPy.")
 
-import raster_dtype as rdtype
+from raster_dtype import RasterDataType
+from driver_ext import DriverExt
 import array_stat
 
 from fix_proj_decorator import fix_missing_proj
@@ -74,9 +75,6 @@ def _dt2float(dt):
 
 def write_file(out_filename, array=None, overwrite=False,
                xoffset=0, yoffset=0, band_idx=1, **kw):
-    #               drivername=None, dtype=None,
-    #               array=None, width=None, height=None, depth=None, dt=None,
-    #               srs=None, transform=None, xoffset=0, yoffset=0):
     """Writes a NumPy array to an image file.
 
     If there is no array (array is None), the function simply create an empty
@@ -108,9 +106,6 @@ def write_file(out_filename, array=None, overwrite=False,
     :param band_idx: depth offset. First band from which to write the array
                     in the output file if the array is smaller (default: 1)
     :type band_idx: int
-    :param driver: name of the driver to use. None means that the file
-                       already exists
-    :type driver: gdal.Driver
     :param width: horizontal size of the image to be created
     :type width: int
     :param height: vertical size of the image to be created
@@ -141,18 +136,20 @@ def write_file(out_filename, array=None, overwrite=False,
         number_bands = 1
     dtype = kw['dtype'] \
         if kw.get('dtype') \
-        else rdtype.RasterDataType(numpy_dtype=array.dtype)
+        else RasterDataType(numpy_dtype=array.dtype.type)
 
     # Create an empty raster file if it does not exists or if overwrite is True
     try:
         assert not overwrite
         out_ds = gdal.Open(out_filename, gdal.GA_Update)
     except (AssertionError, RuntimeError):
-        out_ds = kw['driver'].Create(out_filename,
-                                     xsize,
-                                     ysize,
-                                     number_bands,
-                                     dtype.gdal_dtype)
+        _, ext = os.path.splitext(out_filename)
+        driver = DriverExt(extension=ext).gdal_driver
+        out_ds = driver.Create(out_filename,
+                               xsize,
+                               ysize,
+                               number_bands,
+                               dtype.gdal_dtype)
 
     # Set metadata
     if kw.get('date_time'):
@@ -239,7 +236,6 @@ def concatenate_rasters(*rasters, **kw):
 
 
 def temporal_stats(rasters,
-                   drivername,
                    band_idx=1,
                    stats=['min', 'max'],
                    date2float=_dt2float,
@@ -258,8 +254,6 @@ def temporal_stats(rasters,
 
     :param rasters: list of rasters to compute statistics from
     :type rasters: list of ``Raster`` instances
-    :param drivername: driver to use for writing the output file
-    :type drivername: str
     :param band_idx: index of the band to compute statistics on (default: 1)
     :type band_idx: int
     :param stats: list of stats to compute
@@ -284,7 +278,7 @@ def temporal_stats(rasters,
     raster0 = rasters[0]
     meta = raster0.meta
     meta['count'] = depth
-    meta['dtype'] = rdtype.RasterDataType(lstr_dtype='float64'),
+    meta['dtype'] = RasterDataType(lstr_dtype='float64'),
     write_file(out_filename, overwrite=True, **meta)
 
     # TODO: improve to find better "natural" blocks than using the "natural"
@@ -367,7 +361,7 @@ class Raster(Sized):
 
     @property
     def driver(self):
-        """The raster's GDAL driver (gdal.Driver object)"""
+        """The raster's GDAL driver (DriverExt object)"""
         return self._driver
 
     @property
@@ -387,7 +381,7 @@ class Raster(Sized):
 
     @property
     def dtype(self):
-        """The raster's data type (rdtype.RasterDataType object)"""
+        """The raster's data type (RasterDataType object)"""
         return self._dtype
 
     @property
@@ -455,23 +449,23 @@ class Raster(Sized):
     def refresh(self):
         """Reread the raster's properties from file."""
         ds = gdal.Open(self._filename, gdal.GA_ReadOnly)
-        self._driver = ds.GetDriver()                   # gdal.Driver object
-        self._width = ds.RasterXSize                    # int
-        self._height = ds.RasterYSize                   # int
-        self._count = ds.RasterCount                    # int
-        self._dtype = rdtype.RasterDataType(
-            gdal_dtype=ds.GetRasterBand(1).DataType)    # RasterDataType object
+        self._driver = DriverExt(gdal_driver=ds.GetDriver())
+        self._width = ds.RasterXSize
+        self._height = ds.RasterYSize
+        self._count = ds.RasterCount
+        self._dtype = RasterDataType(
+            gdal_dtype=ds.GetRasterBand(1).DataType)
         self._block_size = tuple(
-            ds.GetRasterBand(1).GetBlockSize())         # tuple
-        try:                                            # datetime object
+            ds.GetRasterBand(1).GetBlockSize())
+        try:
             self._date_time = datetime.strptime(
                 ds.GetMetadataItem('TIFFTAG_DATETIME'), '%Y:%m:%d %H:%M:%S')
         except ValueError:  # string has wrong datetime format
             self._date_time = None
         except TypeError:   # there is no DATETIME tag
             self._date_time = None
-        self._nodata_value = ds.GetRasterBand(1).GetNoDataValue()   # float
-        self._transform = ds.GetGeoTransform(can_return_null=True)  # tuple
+        self._nodata_value = ds.GetRasterBand(1).GetNoDataValue()
+        self._transform = ds.GetGeoTransform(can_return_null=True)
         self._gdal_extent = tuple(
             (self._transform[0]
              + x * self._transform[1]
@@ -480,10 +474,7 @@ class Raster(Sized):
              + x * self._transform[4]
              + y * self._transform[5])
             for (x, y) in ((0, 0), (0, ds.RasterYSize), (ds.RasterXSize, 0),
-                           (ds.RasterXSize, ds.RasterYSize)))       # tuple
-
-        # Read projection as a osr.SpatialReference object
-        # or None if there is no projection in metadata
+                           (ds.RasterXSize, ds.RasterYSize)))
         self._srs = osr.SpatialReference(ds.GetProjection()) \
             if ds.GetProjection() \
             else None
@@ -655,18 +646,18 @@ class Raster(Sized):
         else:
             return Raster(out_filename)
 
-    def rescale_bands(self, idxs, dstmin, dstmax, **kw):
+    def rescale_bands(self, dstmin, dstmax, *idxs, **kw):
         """Rescale one or more of the raster's bands.
 
         For each specified band, values are rescaled between given minimum and
         maximum values.
 
-        :param band_idx: index value to the band to rescale
-        :type band_idx: int
-        :param outmin: minimum value to the rescaled band
-        :type outmin: float
-        :param outmax: maximum value to the rescaled band
-        :type outmax: float
+        :param dstmin: minimum value to the rescaled band
+        :type dstmin: float
+        :param dstmax: maximum value to the rescaled band
+        :type dstmax: float
+        :param idxs: indices of bands to rescale
+        :type idxs: int
         :param out_filename: path to the output file. If omitted, then the
                              raster file is overwritten
         :type out_filename: str
@@ -677,7 +668,7 @@ class Raster(Sized):
             if kw.get('out_filename') \
             else os.path.join(gettempdir(), 'bands_rescaled.tif')
         meta = self.meta
-        meta['dtype'] = rdtype.RasterDataType(gdal_dtype=gdal.GDT_Float64)
+        meta['dtype'] = RasterDataType(gdal_dtype=gdal.GDT_Float64)
         write_file(out_filename, overwrite=True, **meta)
 
         # For each band, compute rescale if asked, then save band in empty file
@@ -1327,7 +1318,7 @@ class Raster(Sized):
             else '{:b}_label_stats.tif'.format(self)
         meta = self.meta
         meta['count'] = len(stats) * self._count
-        meta['dtype'] = rdtype.RasterDataType(gdal_dtype=gdal.GDT_Float64)
+        meta['dtype'] = RasterDataType(gdal_dtype=gdal.GDT_Float64)
         write_file(out_filename, overwrite=True, **meta)
 
         # Get array of labels from label file

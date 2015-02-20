@@ -4,9 +4,8 @@ import unittest
 import doctest
 import tempfile
 
-from ymraster import write_file, concatenate_rasters, Raster
-from ymraster.dtype import RasterDataType
-from osgeo import ogr, osr, gdal
+from ymraster import write_file, concatenate_rasters, Raster, RasterDataType
+from osgeo import ogr, osr
 import numpy as np
 
 import re
@@ -26,8 +25,7 @@ def write_file_unique_value(filename,
                     dtype=dtype.numpy_dtype) * value \
         if number_bands > 1 \
         else np.ones((height, width), dtype=dtype.numpy_dtype) * value
-    write_file(filename, driver=gdal.GetDriverByName('GTiff'), dtype=dtype,
-               array=array)
+    write_file(filename, array=array)
 
 
 def _check_image(tester,
@@ -151,7 +149,6 @@ class TestArrayToRaster(unittest.TestCase):
                     dtype=dtype.numpy_dtype) * value
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
         self.assertRaises(ValueError, write_file, out_file.name,
-                          driver=gdal.GetDriverByName('GTiff'), dtype=dtype,
                           array=a)
 
     def testwrite_file_should_raise_not_implemented_if_four_dimensional(self):
@@ -164,7 +161,6 @@ class TestArrayToRaster(unittest.TestCase):
                     dtype=dtype.numpy_dtype) * value
         out_file = tempfile.NamedTemporaryFile(suffix='.tif')
         self.assertRaises(ValueError, write_file, out_file.name,
-                          driver=gdal.GetDriverByName('GTiff'), dtype=dtype,
                           array=a)
 
     def tearDown(self):
@@ -182,14 +178,14 @@ class TestRaster(unittest.TestCase):
         filename = 'data/l8_20130425.tif'
         raster = Raster(filename)
         self.assertEqual(raster.filename, filename)
-        self.assertEqual(raster.meta['driver'].GetDescription(), u'GTiff')
-        self.assertEqual(raster.meta['width'], 66)
-        self.assertEqual(raster.meta['height'], 56)
-        self.assertEqual(raster.meta['count'], 7)
-        self.assertEqual(raster.meta['dtype'].lstr_dtype, 'int16')
-        self.assertEqual(raster.meta['block_size'], (66, 8))
-        self.assertEqual(raster.meta['date_time'], datetime(2013, 04, 25))
-        self.assertEqual(raster.meta['gdal_extent'],
+        self.assertEqual(raster.driver.gdal_name, 'GTiff')
+        self.assertEqual(raster.width, 66)
+        self.assertEqual(raster.height, 56)
+        self.assertEqual(raster.count, 7)
+        self.assertEqual(raster.dtype.lstr_dtype, 'int16')
+        self.assertEqual(raster.block_size, (66, 8))
+        self.assertEqual(raster.date_time, datetime(2013, 04, 25))
+        self.assertEqual(raster.gdal_extent,
                          ((936306.723651, 6461635.694121),
                           (936306.723651, 6459955.694121),
                           (938286.723651, 6461635.694121),
