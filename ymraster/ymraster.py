@@ -235,11 +235,7 @@ def concatenate_rasters(*rasters, **kw):
         os.remove(out_filename)
 
 
-def temporal_stats(rasters,
-                   band_idx=1,
-                   stats=['min', 'max'],
-                   date2float=_dt2float,
-                   **kw):
+def temporal_stats(*rasters, **kw):
     """Compute pixel-wise statistics from a given list of temporally distinct,
     but spatially identical, rasters.
 
@@ -265,6 +261,21 @@ def temporal_stats(rasters,
                          based on the stats to compute.
     :type out_filename: str
     """
+    # Stats to compute
+    stats = kw['stats'] \
+        if kw.get('stats') \
+        else ['min', 'max', 'mean']
+
+    # Date function
+    date2float = kw['date2float'] \
+        if kw.get('date2float') \
+        else _dt2float
+
+    # Band to compute statistics on
+    band_idx = kw['band_idx'] \
+        if kw.get('band_idx') \
+        else 1
+
     # Out filename
     out_filename = kw['out_filename'] \
         if kw.get('out_filename') \
@@ -275,17 +286,19 @@ def temporal_stats(rasters,
                               if array_stat.ArrayStat(statname).is_summary])
 
     # Create an empty file of correct size and type
+    rasters = list(rasters)
     raster0 = rasters[0]
     meta = raster0.meta
     meta['count'] = depth
-    meta['dtype'] = RasterDataType(lstr_dtype='float64'),
+    meta['dtype'] = RasterDataType(lstr_dtype='float64')
     write_file(out_filename, overwrite=True, **meta)
 
     # TODO: improve to find better "natural" blocks than using the "natural"
     # segmentation of simply the first image
     for block_win in raster0.block_windows():
         # Turn each block into an array and concatenate them into a stack
-        block_arrays = [raster.array(band_idx, block_win) for raster in rasters]
+        block_arrays = [raster.array_from_bands(band_idx, block_win=block_win)
+                        for raster in rasters]
         block_stack = np.dstack(block_arrays) \
             if len(block_arrays) > 1 \
             else block_arrays[0]
@@ -299,7 +312,7 @@ def temporal_stats(rasters,
                 date_array = astat.indices(block_stack)
                 for x in np.nditer(date_array, op_flags=['readwrite']):
                     try:
-                        x[...] = date2float(rasters[x]._datetime)
+                        x[...] = date2float(rasters[x].date_time)
                     except TypeError:
                         raise ValueError(
                             'Image has no date/time metadata: {:f}'.format(
