@@ -369,39 +369,6 @@ class TestConcatenateImages(unittest.TestCase):
                           out_filename=out_file.name)
 
 
-class TestFusion(unittest.TestCase):
-
-    def setUp(self):
-        self.ms = Raster('data/Spot6_MS_31072013.tif')
-
-    def test_fusion_should_work_if_same_date_same_extent(self):
-        out_file = tempfile.NamedTemporaryFile(suffix='.tif')
-        pan = Raster('data/Spot6_Pan_31072013.tif')
-        self.ms.fusion(pan, out_filename=out_file.name)
-        _check_image(tester=self,
-                     filename=out_file.name,
-                     driver=u'GTiff',
-                     width=pan.meta['width'],
-                     height=pan.meta['height'],
-                     number_bands=self.ms.meta['count'],
-                     dtype='Float32',
-                     proj=self.ms.meta['srs'].ExportToProj4())
-
-    def test_fusion_should_raise_assertion_error_if_not_same_extent(self):
-        out_file = tempfile.NamedTemporaryFile(suffix='.tif')
-        pan = Raster('data/Spot6_Pan_31072013_unproj.tif')
-        self.assertRaises(AssertionError, self.ms.fusion, pan,
-                          out_filename=out_file.name)
-
-    def tearDown(self):
-        tmpdir = tempfile.gettempdir()
-        tmpfilenames = [filename
-                        for filename in os.listdir(tmpdir)
-                        if filename.endswith('.tif.aux.xml')]
-        for filename in tmpfilenames:
-            os.remove(os.path.join(tmpdir, filename))
-
-
 class TestOtbFunctions(unittest.TestCase):
 
     def setUp(self):
