@@ -1,19 +1,7 @@
 # -*- coding: utf-8 -*-
 
-"""
-A ``Raster`` instance represents a raster read from a file.
-
->>> raster = Raster('tests/data/RGB.byte.tif')
-
-It has some attributes:
-
->>> raster.filename
-'tests/data/RGB.byte.tif'
->>> raster.width
-791
-
-Functions and methods
-=====================
+"""The `ymraster` module encloses the main methods and functions to work with
+raster images.
 """
 
 try:
@@ -190,7 +178,7 @@ def concatenate_rasters(*rasters, **kw):
     the default data type in OTB (_float_ currently).
 
     :param rasters: the rasters to concatenate
-    :type rasters: list of ``Raster`` instances
+    :type rasters: list of `Raster` instances
     :param out_filename: path to the output file. If omitted, the append all
                          rasters into the first one given
     :type out_filename: str to the output file
@@ -249,7 +237,7 @@ def temporal_stats(*rasters, **kw):
     1366840800.0)
 
     :param rasters: list of rasters to compute statistics from
-    :type rasters: list of ``Raster`` instances
+    :type rasters: list of `Raster` instances
     :param band_idx: index of the band to compute statistics on (default: 1)
     :type band_idx: int
     :param stats: list of stats to compute
@@ -338,10 +326,12 @@ class Raster(Sized):
     """
 
     def __init__(self, filename):
-        """Create a new raster object read from a file
+        """Create a new `YmRaster` instance from an image file.
 
-        Args:
-            filename (str) path to the file to read
+        Parameters
+        ----------
+        filename : str
+            path to the image file to read
         """
         self._filename = filename
         self.refresh()
@@ -496,13 +486,29 @@ class Raster(Sized):
         ds = None
 
     def has_same_extent(self, raster, prec=0.01):
-        """Returns True if the raster and the other one has same extent, that is
-        the boundaries are equal.
+        """Returns True if the raster and the given one has same extent.
 
-        Args:
-            raster (``Raster``): raster to compare extent with.
-            prec (float, optional): difference threshold under which coordinates
-                are said to be equal.
+        Parameters
+        ----------
+        raster : `Raster`
+            raster to compare extent with.
+        prec : float, optional
+            difference threshold under which coordinates are said to be equal
+            (default: 1).
+
+        Returns
+        -------
+        bool
+            boolean saying if both rasters have same extent.
+
+        Examples
+        --------
+        >>> filename = os.path.join('data', 'l8_20130425.tif')
+        >>> other_filename = os.path.join('data', 'l8_20130714.tif')
+        >>> raster = Raster(filename)
+        >>> other_raster = Raster(other_filename)
+        >>> raster.has_same_extent(other_raster)
+        True
         """
         extents_almost_equals = tuple(
             map(lambda t1, t2: (abs(t1[0] - t2[0]) <= prec,
@@ -512,17 +518,20 @@ class Raster(Sized):
                                          (True, True), (True, True))
 
     def block_windows(self, block_size=None):
-        """Get coordinates of all blocks in the raster that have the given size.
+        """Yield coordinates of each block in the raster, in order.
 
-        It takes care of adjusting the size at right and bottom edges.
+        It takes care of adjusting the block size at right and bottom edges.
 
-        Args:
-            block_size (tuple (xsize, ysize), optional): wanted size for each
-                block (defaults to the "natural" block size of the raster)
+        Parameters
+        ----------
+        block_size : tuple of int (xsize, ysize), optional
+            wanted size for each block. By default, the "natural" block size of
+            the raster is used.
 
-        Yields:
-            tuple (i, j, xsize, ysize): coordinates of the next block of given
-            size in the raster
+        Yields
+        ------
+        tuple of int (i, j, xsize, ysize)
+            coordinates of each block
         """
         # Default size for blocks
         xsize, ysize = block_size if block_size else self.block_size
@@ -541,25 +550,38 @@ class Raster(Sized):
                 yield (j, i, number_cols, number_rows)
 
     def array_from_bands(self, *idxs, **kw):
-        """Returns the NumPy array extracted from the raster according to the
-        given parameters.
+        """Returns a NumPy array from the raster according to the given
+        parameters.
 
-        If band indices are given, then only values from these bands are
+        If some `idxs` are given, then only values from corresponding bands are
         returned.
 
-        If the ``block_win`` parameter is given, then only values inside the
-        specified coordinates are returned.
+        If the `block_win` parameter is given, then only values inside the
+        specified coordinates (window) are returned.
 
-        These parameters can be combined to get, for example, a block only from
-        one band.
+        The two preceding parameters can be combined to get, for example, a
+        block only from one band.
 
-        Args:
-            idxs (int, optional): indices of bands to get array from
-            block_win (tuple (x, y, xsize, ysize), optional): block window to
-                get array from
+        If the `mask_nodata` parameter is given and `True`, then NODATA values
+        are masked in the array and a `MaskedArray` is returned.
 
-        Returns:
-            numpy.ndarray: array extracted from the raster
+        Parameters
+        ----------
+        idxs : int, optional
+            indices of bands to get array from. By default, all bands are
+            returned.
+        block_win : tuple of int (x, y, xsize, ysize), optional
+            block window to get array from. By default, all pixel values are
+            returned.
+        mask_nodata : bool, optional
+            if `True` NODATA values are masked in a returned `MaskedArray`.
+            Else a simple `ndarray` is returned whith all values. True by
+            default.
+
+        Returns
+        -------
+        numpy.ndarray or numpy.ma.MaskedArray
+            array extracted from the raster.
         """
         # Get size of output array and initialize an empty array (if multi-band)
         (hsize, vsize) = (kw['block_win'][2], kw['block_win'][3]) \
@@ -585,39 +607,71 @@ class Raster(Sized):
                 array[:, :, array_i] = ds.GetRasterBand(ds_i).ReadAsArray()
         ds = None
 
-        # Create the masked array if wanted
-        if kw.get('mask_nodata'):
+        # Returned a masked array if wanted or if no indication
+        if kw.get('mask_nodata') or 'mask_nodata' not in kw:
             return ma.masked_where(array == self._nodata_value, array)
         else:
             return array
 
-    def band_arrays(self, mask_nodata=False):
-        """Returns an iterator that yields each successive band as an array
-        along with its index.
+    def band_arrays(self, mask_nodata=True):
+        """Yields each band in the raster as an array, in order, along with its
+        index.
+
+        Parameters
+        ----------
+        mask_nodata : bool, optional
+            if `True` NODATA values are masked in a returned `MaskedArray`.
+            Else a simple `ndarray` is returned whith all values. True by
+            default.
+
+        Yields
+        ------
+        tuple (numpy.ndarray, int) or (numpy.ma.MaskedArray, int)
+            Tuple with an array corresponding to each band, in order, and with
+            the band index.
         """
         for i in range(self._count):
             yield (self.array_from_bands(i+1, mask_nodata=mask_nodata), i+1)
 
-    def block_arrays(self, mask_nodata=False):
-        """Returns an iterator that yields each successive block as an array
-        along with its xoffset and yoffset.
+    def block_arrays(self, block_size=None, mask_nodata=True):
+        """Yields each block in the raster as an array, in order, along with its
+        xoffset and yoffset.
+
+        Parameters
+        ----------
+        block_size : tuple of int (xsize, ysize), optional
+            Size of blocks to yields. By default, "natural" block size is used.
+        mask_nodata : bool, optional
+            if `True` NODATA values are masked in a returned `MaskedArray`.
+            Else a simple `ndarray` is returned whith all values. True by
+            default.
+
+        Yields
+        ------
+        tuple (numpy.ndarray, int, int) or (numpy.ma.MaskedArray, int, int)
+            Tuple with an array corresponding to each block, in order, and with
+            the block xoffset and yoffset.
         """
-        for block_win in self.block_windows():
+        for block_win in self.block_windows(block_size=block_size):
             yield (self.array_from_bands(block_win=block_win,
                                          mask_nodata=mask_nodata),
                    block_win[0],
                    block_win[1])
 
     def remove_bands(self, *idxs, **kw):
-        """Writes a raster which is the same than the current raster, except
-        that the band(s) at the given indices will be removed.
+        """Saves a new raster with the specified bands removed.
 
-        :param idxs: one or more indices of the band(s) to remove (starts at 1)
-        :type idxs: int
-        :param out_filename: path to the output file. If omitted, then the
-                             raster file is overwritten
-        :type out_filename: str
-        :returns: the ``Raster`` instance corresponding to the output file
+        Parameters
+        ----------
+        idxs : int
+            One or more indices of the band(s) to remove (numbering starts at 1)
+        out_filename : str
+            Path to the output file. If omitted, then the raster is overwritten
+
+        Returns
+        -------
+        `Raster` or None
+            Output raster or None if the raster is overwritten
         """
         indices = list(idxs)
 
@@ -660,21 +714,26 @@ class Raster(Sized):
             return Raster(out_filename)
 
     def rescale_bands(self, dstmin, dstmax, *idxs, **kw):
-        """Rescale one or more of the raster's bands.
+        """Rescales one or more bands in the raster.
 
         For each specified band, values are rescaled between given minimum and
         maximum values.
 
-        :param dstmin: minimum value to the rescaled band
-        :type dstmin: float
-        :param dstmax: maximum value to the rescaled band
-        :type dstmax: float
-        :param idxs: indices of bands to rescale
-        :type idxs: int
-        :param out_filename: path to the output file. If omitted, then the
-                             raster file is overwritten
-        :type out_filename: str
-        :returns: the ``Raster`` instance corresponding to the output file
+        Parameters
+        ----------
+        dstmin : float
+            Minimum value in the new scale.
+        dstmax : float
+            Maximum value in the new scale.
+        idxs : int
+            One or more indices of the bands to rescale.
+        out_filename : str
+            path to the output file. If omitted, then the raster is overwritten
+
+        Returns
+        -------
+        `Raster` or None
+            Output raster or None if the raster is overwritten
         """
         # Create an empty file with same size and dtype of float64
         out_filename = kw['out_filename'] \
@@ -711,19 +770,23 @@ class Raster(Sized):
             return Raster(out_filename)
 
     def fusion(self, pan, **kw):
-        """Sharpen the raster with a more detailed panchromatic image, and save
-        the result into the specified output file.
+        """Sharpen the raster with its corresponding panchromatic image.
 
-        This function is quite conservative about extent and dates. Panchromatic
-        image should have same extent than the raster, and date/time of the two
-        images should be the same.
+        This function is quite conservative about extent and dates. The
+        Panchromatic image should have same extent than the raster, and
+        date/time of the two images should be the same.
 
-        :param pan: panchromatic image to use for sharpening
-        :type pan: ``Raster``
-        :param out_filename: path to the output file. If omitted, overwrites the
-                             raster's file
-        :type out_filename: str
-        :returns: the ``Raster`` instance corresponding to the output file
+        Parameters
+        ----------
+        pan : `Raster`
+            Panchromatic image to use for sharpening.
+        out_filename : str
+            Path to the output file. If omitted, then the raster is overwritten.
+
+        Returns
+        -------
+        `Raster` or `None`
+            Output raster or `None` if the raster is overwritten.
         """
         # Check extents
         assert self.has_same_extent(pan), \
@@ -758,16 +821,30 @@ class Raster(Sized):
 
     @fix_missing_proj
     def radiometric_indices(self, *indices, **kw):
-        """Writes a raster in which each band is a radiometric index given as
-        parameter
+        """Saves a raster of radiometric indices about the raster.
 
-        :param indices: indices to compute
-        :type indices: str
-        :param kw: keywords arguments that specify indices of needed bands
-        :returns: the ``Raster`` instance corresponding to the output file
-        :param out_filename: path to the output file. If omitted, filename will
-                             be based on indices to compute
-        :type out_filename: str
+        Parameters
+        ----------
+        indices : str
+            Radiometric indices to compute.
+        blue_idx: int
+            index of a blue band (numbering starts at 1).
+        green_idx: int
+            index of a green band.
+        red_idx: int
+            index of a red band.
+        nir_idx: int
+            index of a nir band.
+        mir_idx: int
+            index of a mir band.
+        out_filename: str
+            Path to the output file. If omitted, a default filename will be
+            chosen.
+
+        Returns
+        -------
+        `Raster`
+            Output raster
         """
         # Out file
         out_filename = None
@@ -816,19 +893,23 @@ class Raster(Sized):
         return out_raster
 
     def ndvi(self, red_idx, nir_idx, **kw):
-        """Writes the Normalized Difference Vegetation Index (NDVI) of the
-        raster into the specified output file.
+        """Saves the Normalized Difference Vegetation Index (NDVI) of the
+        raster.
 
-        :param out_filename: path to the output file
-        :type out_filename: str
-        :param red_idx: index of a red band (starts at 1)
-        :type red_idx: int
-        :param nir_idx: index of a near-infrared band (starts at 1)
-        :type nir_idx: int
-        :returns: the ``Raster`` instance corresponding to the output file
-        :param out_filename: path to the output file. If ommited, filename is
-                             based on raster name with suffix '_ndvi'
-        :type out_filename: str
+        Parameters
+        ----------
+        red_idx : int
+            Index of a red band (numbering starts at 1).
+        nir_idx : int
+            Index of a near-infrared band.
+        out_filename : str
+            Path to the output file. If omitted, a default filename will be
+            chosen.
+
+        Returns
+        -------
+        `Raster`
+            Output raster.
         """
         out_filename = kw['out_filename'] \
             if kw.get('out_filename') \
@@ -839,17 +920,22 @@ class Raster(Sized):
                                         out_filename=out_filename)
 
     def ndwi(self, nir_idx, mir_idx, **kw):
-        """Writes the Normalized Difference Vegetation Index (NDWI) of the
-        raster into the given output file.
+        """Saves the Normalized Difference Water Index (NDWI) of the raster.
 
-        :param nir_idx: index of the near infrared band (starts at 1)
-        :type nir_idx: int
-        :param mir_idx: index of the middle infrared band (starts at 1)
-        :type mir_idx: int
-        :returns: the ``Raster`` instance corresponding to the output file
-        :param out_filename: path to the output file. If ommited, filename is
-                             based on raster name with suffix '_ndwi'
-        :type out_filename: str
+        Parameters
+        ----------
+        nir_idx : int
+            Index of a near infrared band (numbering starts at 1).
+        mir_idx : int
+            Index of the middle infrared band.
+        out_filename : str
+            path to the output file. If ommited, a default filename will be
+            chosen.
+
+        Returns
+        -------
+        `Raster`
+            Output raster.
         """
         out_filename = kw['out_filename'] \
             if kw.get('out_filename') \
@@ -860,17 +946,23 @@ class Raster(Sized):
                                         out_filename=out_filename)
 
     def mndwi(self, green_idx, mir_idx, **kw):
-        """Writes the Modified Normalized Difference Water Index (MNDWI) of the
-        image into the given output file.
+        """Saves the Modified Normalized Difference Water Index (MNDWI) of the
+        raster.
 
-        :param green_idx: index of the green band
-        :type green_idx: int
-        :param mir_idx: index of the middle infrared band
-        :type mir_idx: int
-        :returns: the ``Raster`` instance corresponding to the output file
-        :param out_filename: path to the output file. If ommited, filename is
-                             based on raster name with suffix '_mndwi'
-        :type out_filename: str
+        Parameters
+        ----------
+        green_idx : int
+            Index of a green band (numbering starts at 1).
+        mir_idx : int
+            Index of the middle infrared band.
+        out_filename : str
+            Path to the output file. If ommited, a default filename will be
+            chosen.
+
+        Returns
+        -------
+        `Raster`
+            Output raster.
         """
         out_filename = kw['out_filename'] \
             if kw.get('out_filename') \
@@ -885,22 +977,36 @@ class Raster(Sized):
     def append(self, *rasters):
         """Append the given rasters into the current one.
 
-        :param rasters: rasters to append after the current raster
-        :type rasters: ``Raster``
+        Parameters
+        ----------
+        rasters: `Raster`
+            One or more rasters to append after the current one.
         """
         raster_list = [self] + list(rasters)
         concatenate_rasters(raster_list)
 
     def apply_mask(self, mask_raster, mask_value=1, set_value=None, **kw):
-        """Apply a mask to an image. It can be a multi-band image. It returns
-        a raster object of the masked image.
+        """Apply a mask to the raster: set all masked pixels to a given value.
 
-        :param mask_raster: the mask to be applied
-        :param mask_value: the "masked" value in the given mask (default: 1)
-        :param out_filename: path of the output file. If omitted, raster file
-                             will be overwritten
-        :param set_value: the value to set in the raster where a pixel have
-                          been masked
+        NODATA will be set to set_value afterward.
+
+        Parameters
+        ----------
+        mask_raster : `Raster`
+            Mask to be applied.
+        mask_value : float
+            Value of "masked" pixels in the mask (default: 1).
+        set_value : float
+            Value to set to the "masked" pixels in the raster. If omitted,
+            maximum value of the data type is chosen.
+        out_filename : str
+            Path of the output file. If omitted, a default filename will be
+            chosen.
+
+        Returns
+        -------
+        `Raster`
+            Output raster.
         """
         # Check for extent
         assert self.has_same_extent(mask_raster), \
@@ -952,38 +1058,40 @@ class Raster(Sized):
 
     def _lsms_smoothing(self, spatialr, ranger, thres=0.1, rangeramp=0,
                         maxiter=10, **kw):
-        """First step of a Large-Scale Mean-Shift (LSMS) segmentation: performs
-        a mean shift smoothing on the raster.
+        """First step in a Large-Scale Mean-Shift (LSMS) segmentation: smooths
+        the raster.
 
-        This is an adapted version of the Orfeo Toolbox ``MeanShiftSmoothing``
+        This is an adapted version of the Orfeo Toolbox `MeanShiftSmoothing`
         application. See
         http://www.orfeo-toolbox.org/CookBook/CookBooksu91.html#x122-5480005.5.2
-        for more details
+        for more details.
 
-        :param spatialr: spatial radius of the window (in number of pixels)
-        :type spatialr: int
-        :param ranger: range radius defining the spectral window size (expressed
-                       in radiometry unit)
-        :type ranger: float
-        :param thres: mean shift vector threshold
-        :type thres: float
-        :param rangeramp: range radius coefficient. This coefficient makes
-                          dependent the ``ranger`` of the colorimetry of the
-                          filtered pixel:
-                          .. math::
+        Parameters
+        ----------
+        spatialr : int
+            Spatial radius of the window (in number of pixels).
+        ranger : float
+            Range radius defining the spectral window size (expressed in
+            radiometry unit).
+        thres : float
+            Mean shift vector threshold.
+        rangeramp : float
+            range radius coefficient. This coefficient makes dependent the
+            `ranger` of the colorimetry of the filtered pixel: .. math::
 
                               y = rangeramp * x + ranger
-        :type rangeramp: float
-        :param maxiter: maximum number of iterations in case of non-convergence
-                        of the algorithm
-        :type maxiter: int
-        :param out_spatial_filename: path to the spatial image to be written
-        :type out_spatial_filename: str
-        :param out_filename: path to the smoothed file to be written
-        :type out_filename: str
-        :returns: two ``Raster`` instances corresponding to the filtered image
-                  and the spatial image
-        :rtype: tuple of ``Raster``
+        maxiter : int
+            maximum number of iterations in case of non-convergence of the
+            algorithm.
+        out_spatial_filename : str
+            Path to the spatial image to be written.
+        out_filename : str
+            Path to the smoothed file to be written.
+
+        Returns
+        -------
+        tuple of 2 `Raster`
+            filtered and spatial raster.
         """
         # Out files
         out_filename = kw['out_filename'] \
@@ -1012,39 +1120,44 @@ class Raster(Sized):
     def _lsms_segmentation(self, spatialr, ranger, spatial_raster,
                            block_size=None, **kw):
         """Second step in a LSMS segmentation: performs the actual object
-        segmentation on the raster. Produce an image whose pixels are given a
-        label number, based on their spectral and spatial proximity.
+        segmentation on the raster.
 
-        This assumes that the ``Raster`` object is smoothed, for example as
-        returned by the ``lsms_smoothing`` method.
+        Produce an image whose pixels are given a label number, based on their
+        spectral and spatial proximity.
+
+        This assumes that the `Raster` object is smoothed, for example as
+        returned by the `lsms_smoothing` method.
 
         To consume less memory resources, the method tiles the raster and
         performs the segmentation on each tile.
 
-        This is an adapted version of the Orfeo Toolbox ``LSMSSegmentation``
-        application where there is no option to set a ``minsize`` parameter to
+        This is an adapted version of the Orfeo Toolbox `LSMSSegmentation`
+        application where there is no option to set a `minsize` parameter to
         discard small objects. See
         http://www.orfeo-toolbox.org/CookBook/CookBooksu121.html#x156-8990005.9.3
         for more details
 
-        :param spatialr: spatial radius of the window
-        :type spatialr: int
-        :param ranger: range radius defining the spectral window size (expressed
-                       in radiometry unit)
-        :type ranger: float
-        :param block_size: wanted size for the blocks. To save memory, the
-                          segmentation work on blocks instead of the whole
-                          raster. If None, use the natural block size of the
-                          raster.
-        :type block_size: tuple (xsize, ysize)
-        :param spatial_raster: a spatial raster associated to this raster
-                                  (for example, as returned by the
-                                  ``lsms_smoothing`` method)
-        :type spatial_raster: ``Raster``
-        :param out_filename: path to the segmented image to be written
-        :type out_filename: str
-        :returns: the raster corresponding to the labeled image
-        :rtype: ``Raster`` instance
+        Parameters
+        ----------
+        spatialr : int
+            Spatial radius of the window
+        ranger : float
+            Range radius defining the spectral window size (expressed in
+            radiometry unit)
+        block_size : tuple of int (xsize, ysize)
+            wanted size for the blocks. To save memory, the segmentation work on
+            blocks instead of the whole raster. If None, use the natural block
+            size of the raster.
+        spatial_raster : `Raster`
+            Spatial raster associated to this raster (for example, as returned
+            by the `lsms_smoothing` method)
+        out_filename : str
+            Path to the segmented image to be written
+
+        Returns
+        -------
+        `Raster`
+            Labeled raster.
         """
         # Blocks size
         tilesizex, tilesizey = block_size if block_size else self.block_size
@@ -1077,37 +1190,37 @@ class Raster(Sized):
         raster whose size in pixels is lower than a given threshold into the
         bigger enough adjacent object with closest radiometry.
 
-        This assumes that the ``Raster`` object is a segmented and labeled
-        image, for example as returned by the ``lsms_segmentation`` method.
+        This assumes that the `Raster` object is a segmented and labeled
+        image, for example as returned by the `lsms_segmentation` method.
 
         The closest bigger object into which the small one is merged is
         determined by using the smoothed image which was produced by the first
         step of smoothing.
 
         This is an adapted version of the Orfeo Toolbox
-        ``LSMSSmallRegionsMerging`` application. See
+        `LSMSSmallRegionsMerging` application. See
         http://www.orfeo-toolbox.org/CookBook/CookBooksu122.html#x157-9060005.9.4
         for more details.
 
-        the LSMSSmallRegionsMerging otb application. It returns a Raster
-        instance of the merged image.
+        Parameters
+        ----------
+        object_minsize : int
+            Threshold defining the minimum size of an object.
+        smoothed_raster : `Raster`
+            Smoothed raster associated to this raster (for example, as returned
+            by the `lsms_smoothing` method)
+        block_size : tuple of int (xsize, ysize)
+            Wanted size for the blocks. To save memory, the merging work on
+            blocks instead of the whole raster. If None, use the natural block
+            size of the raster.
+        out_filename : str
+            path to the merged segmented image to be written.  If omitted,
+            the raster will be overwritten.
 
-        :param object_minsize: threshold defining the minimum size of an object
-        :type object_minsize: int
-        :param smoothed_raster: smoothed raster associated to this raster
-                                (for example, as returned by the
-                                ``lsms_smoothing`` method)
-        :type smoothed_raster: ``Raster``
-        :param block_size: wanted size for the blocks. To save memory, the
-                          merging work on blocks instead of the whole
-                          raster. If None, use the natural block size of the
-                          raster.
-        :type block_size: tuple (xsize, ysize)
-        :param out_filename: path to the merged segmented image to be written.
-                             If omitted, raster file will be overwritten
-        :type out_filename: str
-        :returns: ``Raster`` instance corresponding to the merged segmented
-                  image
+        Returns
+        -------
+        `Raster`
+            Merged segmented raster.
         """
         # Blocks size
         tilesizex, tilesizey = block_size if block_size else self.block_size
@@ -1147,25 +1260,24 @@ class Raster(Sized):
               image,
             * number of pixels in the object.
 
-        This assumes that the ``Raster`` object is a segmented and labeled
-        image, for example as returned by the ``lsms_segmentation`` or the
-        ``lsms_merging`` methods.
+        This assumes that the `Raster` object is a segmented and labeled
+        image, for example as returned by the `lsms_segmentation` or the
+        `lsms_merging` methods.
 
         To consume less memory resources, the method tiles the raster and
         performs the segmentation on each tile.
 
-        to a vector file containing one polygon per segment, using the
-        LSMSVectorization otb application.
-
-        :param orig_raster: original raster from which the segmentation was
-                            computed
-        :type orig_raster: ``Raster``
-        :param block_size: wanted size for the blocks. To save memory, the
-                          vectorization work on blocks instead of the whole
-                          raster. If None, use the natural block size of the
-                          raster.
-        :type block_size: tuple (xsize, ysize)
-        :param out_filename: path to the output vector file
+        Parameters
+        ----------
+        orig_raster : `Raster`
+            Original raster from which the segmentation was computed
+        block_size : tuple of int (xsize, ysize)
+            Wanted size for the blocks. To save memory, the vectorization work
+            on blocks instead of the whole raster. If None, use the natural
+            block size of the raster.
+        out_filename : str
+            Path to the output vector file. If omitted, a default filename will
+            be chosen.
         """
         # Blocks size
         tilesizex, tilesizey = block_size \
@@ -1202,41 +1314,45 @@ class Raster(Sized):
         Produces an image whose pixel values are label numbers, one label per
         object.
 
-        Optionally, if the out_vector_filename parameter is given, then also
+        Optionally, if the `out_vector_filename` parameter is given, then also
         writes a shapefile where each polygon is an object with its label number
         as an attribute.
 
-        :param spatialr: the algorithm compute the segmentation with a floating
-                         window which browse the image. This parameter specify
-                         the spatial radius of the window (in number of pixels)
-        :type spatialr: int
-        :param ranger: spectral range radius (expressed in radiometry unit).
-                       This says how objects are computed.
-        :type ranger: float
-        :param thres: mean shift vector threshold
-        :type thres: float
-        :param rangeramp: range radius coefficient. This coefficient makes
-                          dependent the ``ranger`` of the colorimetry of the
-                          filtered pixel:
-                          .. math::
+        Parameters
+        ----------
+        spatialr : int
+            Spatial radius in pixels. The algorithm compute the segmentation
+            with a floating window which browse the image. This parameter
+            specify the size of the window.
+        ranger : float
+            spectral range radius (expressed in radiometry unit).  This says how
+            objects are determined from homogeneous pixels.
+        thres : float
+            Mean shift vector threshold
+        rangeramp : float
+            range radius coefficient. This coefficient makes dependent the
+            `ranger` of the colorimetry of the filtered pixel: .. math::
 
                               y = rangeramp * x + ranger
-        :type rangeramp: float
-        :param maxiter: maximum number of iterations in case of non-convergence
-                        of the algorithm
-        :type maxiter: int
-        :param object_minsize: threshold defining the minimum size in pixel of
-                               an object. If given, objects smaller than this
-                               size will be merged into bigger objects.
-        :type object_minsize: int
-        :param tilesizex: horizontal size of each tile. To save memory, the
-                          segmentation work on tiles instead of the whole image.
-                          If None, use the natural tile size of the image.
-        :type tilesizex: int
-        :param tilesizey: vertical size of each tile. If None, use the natural
-                          tile size of the image.
-        :type tilesizey: int
+        maxiter : int
+            Maximum number of iterations in case of non-convergence of the
+            algorithm
+        object_minsize : int
+            Threshold defining the minimum size in pixel of an object. If given,
+            objects smaller than this size will be merged into a bigger adjacent
+            object.
+        tilesizex : int
+            Horizontal size of each tile. To save memory, the segmentation work
+            on tiles instead of the whole image.  If None, use the natural tile
+            size of the image.
+        tilesizey : int
+            Vertical size of each tile. If None, use the natural tile size of
+            the image.
 
+        Returns
+        -------
+        `Raster`
+            Labeled raster
         """
 
         # Temp filenames
@@ -1308,22 +1424,21 @@ class Raster(Sized):
                     stats=['mean', 'std', 'min', 'max', "per:20",
                            'per:40', 'median', 'per:60', 'per:80'],
                     **kw):
-        """Compute statistics of the labels from a label image and raster. The
-        statistics calculated by default are : mean, standard deviation, min,
-        max and the 20, 40, 50, 60, 80th percentiles. The output is an image
-        at the given format that contains n_band * n_stat_features bands. This
-        method uses the GDAL et NUMPY library.
+        """Compute statistics from a labeled image.
 
-        :param orig_raster: The raster object on which the statistics are
-                            calculated
-        :param out_filename: Path of the output image.
-        :param stats: List of the statistics to be calculated. By default, all
-                      the features are calculated,i.e. mean, std, min, max and
-                      per.
-        :param percentile: List of the percentile to be calculated. By
-                           default, the percentiles are 20, 40, 50, 60, 80.
-        :param ext: Format in wich the output image is written. Any formats
-                    supported by GDAL
+        The statistics calculated by default are: mean, standard deviation, min,
+        max and the 20, 40, 50, 60, 80th percentiles. The output is an image at
+        the given format that contains n_band * n_stat_features bands.
+
+        Parameters
+        ----------
+        label_raster : `Raster`
+            The labeled raster.
+        stats : list of str
+            List of statistics to compute. By default: mean, std, min, max,
+            per:20, per:40, per:50, per:60, per:80.
+        out_filename : str
+            Path of the output image. If omitted, a default filename is chosen.
         """
         # Create an empty file with correct size and dtype float64
         out_filename = kw['out_filename'] \

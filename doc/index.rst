@@ -13,8 +13,8 @@
 .. include:: ../README.rst
 
 
-The ``Raster`` class
-====================
+The ``ymraster`` module
+=======================
 
 .. automodule:: ymraster.ymraster
    :members:
